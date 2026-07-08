@@ -1,6 +1,8 @@
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime
+from datetime import datetime, timedelta
+from streamlit_cookies_controller import CookieController
+import json
 
 st.set_page_config(page_title="Simple Doc Portal", layout="centered")
 
@@ -12,10 +14,51 @@ def init_supabase():
     )
 
 supabase: Client = init_supabase()
+controller = CookieController()
 
+# ====================== PERSISTENT SESSION HELPERS ======================
+def restore_session_from_cookie():
+    """Restore Supabase session from browser cookie (persists across refresh)"""
+    cookie_value = controller.get("supabase_session")
+    if cookie_value:
+        try:
+            session_data = json.loads(cookie_value)
+            supabase.auth.set_session(
+                session_data["access_token"],
+                session_data["refresh_token"]
+            )
+            user_response = supabase.auth.get_user()
+            if user_response.user:
+                st.session_state.user = user_response.user
+                return True
+        except Exception:
+            controller.remove("supabase_session")
+    return False
+
+def save_session_to_cookie(session):
+    """Save access + refresh tokens to cookie so login survives refresh"""
+    session_data = {
+        "access_token": session.access_token,
+        "refresh_token": session.refresh_token
+    }
+    controller.set(
+        "supabase_session",
+        json.dumps(session_data),
+        expires_at=datetime.now() + timedelta(days=7)
+    )
+
+def clear_session_cookie():
+    controller.remove("supabase_session")
+
+# ====================== SESSION STATE ======================
 if "user" not in st.session_state:
     st.session_state.user = None
 
+# Try to restore session from cookie on every rerun/refresh
+if st.session_state.user is None:
+    restore_session_from_cookie()
+
+# ====================== LOGIN / SIGNUP ======================
 if st.session_state.user is None:
     st.title("🔐 Login to Portal")
     
@@ -28,6 +71,7 @@ if st.session_state.user is None:
         try:
             res = supabase.auth.sign_in_with_password({"email": email, "password": password})
             st.session_state.user = res.user
+            save_session_to_cookie(res.session)          # ← persist login
             st.success("✅ Logged in successfully!")
             st.rerun()
         except Exception as e:
@@ -45,11 +89,13 @@ if st.session_state.user is None:
             st.error(f"Signup failed: {str(e)}")
 
 else:
+    # ====================== LOGGED IN VIEW ======================
     st.title(f"Welcome, {st.session_state.user.email} 👋")
     st.write("Document Upload Portal")
     
     if st.button("Logout"):
         supabase.auth.sign_out()
+        clear_session_cookie()                           # ← clear persisted session
         st.session_state.user = None
         st.rerun()
     
@@ -63,7 +109,7 @@ else:
         
             st.write("Debug - User ID:", st.session_state.user.id)   # ← New debug line
         
-         # Upload to Storage
+            # Upload to Storage
             supabase.storage.from_("documents").upload(
                 file_path,
                 uploaded_file.getvalue(),
