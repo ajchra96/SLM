@@ -37,13 +37,12 @@ if st.session_state.user is None:
         try:
             res = supabase.auth.sign_up({
                 "email": email,
-                "password": password
+                "password": password,
+                "options": {"emailRedirectTo": "https://slmeval.streamlit.app"}
             })
-            st.success(f"Signup response: {res}")
-            st.info("✅ Signup done. Try logging in now.")
+            st.success("✅ Signup successful! Try logging in now.")
         except Exception as e:
             st.error(f"Signup failed: {str(e)}")
-            st.error(f"Full debug: {repr(e)}")   # Extra info
 
 else:
     st.title(f"Welcome, {st.session_state.user.email} 👋")
