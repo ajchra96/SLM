@@ -28,7 +28,7 @@ if st.session_state.user is None:
         try:
             res = supabase.auth.sign_in_with_password({"email": email, "password": password})
             st.session_state.user = res.user
-            st.success("✅ Logged in!")
+            st.success("✅ Logged in successfully!")
             st.rerun()
         except Exception as e:
             st.error(f"Login failed: {str(e)}")
@@ -37,12 +37,13 @@ if st.session_state.user is None:
         try:
             res = supabase.auth.sign_up({
                 "email": email,
-                "password": password,
-                "options": {"emailRedirectTo": "https://slmeval.streamlit.app"}
+                "password": password
             })
-            st.success("✅ Signup successful! Try logging in now.")
+            st.success(f"Signup response: {res}")
+            st.info("✅ Signup done. Try logging in now.")
         except Exception as e:
             st.error(f"Signup failed: {str(e)}")
+            st.error(f"Full debug: {repr(e)}")   # Extra info
 
 else:
     st.title(f"Welcome, {st.session_state.user.email} 👋")
@@ -72,7 +73,7 @@ else:
                 "uploaded_at": datetime.now().isoformat()
             }).execute()
             
-            st.success("🎉 Uploaded!")
+            st.success("🎉 File uploaded successfully!")
             st.balloons()
         except Exception as e:
             st.error(f"Upload error: {str(e)}")
