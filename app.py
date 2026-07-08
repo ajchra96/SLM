@@ -50,9 +50,6 @@ if st.session_state.user is None:
                 res = supabase.auth.sign_up({
                     "email": email,
                     "password": password,
-                    "options": {
-                        "emailRedirectTo": st.secrets.get("SITE_URL", "http://localhost:8501")
-                    }
                 })
                 st.success("✅ Signup successful! You can now log in.")
                 # Optional: auto-login if confirmation is disabled
