@@ -52,7 +52,7 @@ else:
         
         page = st.radio(
             "Menu",
-            options=["📚 All Standards", "➕ Upload New Standard", "👤 Profile"],
+            options=["📚 All Standards", "➕ Add New Standard", "👤 Profile"],
             label_visibility="collapsed"
         )
 
@@ -110,7 +110,6 @@ else:
                             st.session_state["uploading_standard_id"] = std_id
                             st.rerun()
 
-                    # Only uploader can delete
                     if std.get("user_id") == user_id:
                         if c4.button("🗑️ Delete", key=f"del_{std_id}", use_container_width=True):
                             try:
@@ -125,7 +124,7 @@ else:
                             except Exception as e:
                                 st.error(f"Delete failed: {str(e)}")
 
-        # Upload section for existing standards without file
+        # Upload file to existing standard (optional)
         uploading_id = st.session_state.get("uploading_standard_id")
         if uploading_id:
             current = next((s for s in standards if s["id"] == uploading_id), None)
@@ -167,49 +166,61 @@ else:
                 except Exception as e:
                     st.error(f"Upload failed: {str(e)}")
 
-    # ============ PAGE 2: UPLOAD NEW STANDARD ============
-    elif page == "➕ Upload New Standard":
-        st.title("➕ Upload New Standard")
-        st.caption("This will be visible to everyone")
+    # ============ PAGE 2: ADD NEW STANDARD (File is now OPTIONAL) ============
+    elif page == "➕ Add New Standard":
+        st.title("➕ Add New Standard")
+        st.caption("File upload is optional. You can add the document later.")
 
-        with st.form("upload_new_standard", clear_on_submit=True):
-            std_name = st.text_input("Standard Name", placeholder="e.g. Environmental Management System")
+        with st.form("add_new_standard", clear_on_submit=True):
+            std_name = st.text_input("Standard Name", placeholder="e.g. Quality Management System v2")
             std_status = st.selectbox("Status", ["Pending", "In Progress", "Under Review", "Completed"])
-            uploaded_file = st.file_uploader("Upload File (PDF recommended)", type=["pdf", "docx", "png", "jpg", "jpeg"])
+            uploaded_file = st.file_uploader(
+                "Upload File (Optional)", 
+                type=["pdf", "docx", "png", "jpg", "jpeg"]
+            )
 
-            submitted = st.form_submit_button("🚀 Create Standard & Upload File", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("Create Standard", type="primary", use_container_width=True)
 
             if submitted:
                 if not std_name.strip():
                     st.error("Please enter a standard name.")
-                elif not uploaded_file:
-                    st.error("Please upload a file.")
                 else:
                     try:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in std_name).strip().replace(" ", "_")
-                        file_path = f"{user_id}/standards/{safe_name}/{timestamp}_{uploaded_file.name}"
+                        file_path = None
+                        file_name = None
+                        uploaded_at = None
 
-                        # Upload file first
-                        supabase.storage.from_("documents").upload(
-                            file_path,
-                            uploaded_file.getvalue(),
-                            {"content-type": uploaded_file.type}
-                        )
+                        # Only upload file if user provided one
+                        if uploaded_file:
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                            safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in std_name).strip().replace(" ", "_")
+                            file_path = f"{user_id}/standards/{safe_name}/{timestamp}_{uploaded_file.name}"
 
-                        # Then create the standard row
+                            supabase.storage.from_("documents").upload(
+                                file_path,
+                                uploaded_file.getvalue(),
+                                {"content-type": uploaded_file.type}
+                            )
+                            file_name = uploaded_file.name
+                            uploaded_at = datetime.now().isoformat()
+
+                        # Create the standard (with or without file)
                         supabase.table("standards").insert({
                             "user_id": user_id,
                             "standard": std_name.strip(),
                             "status": std_status,
                             "file_path": file_path,
-                            "file_name": uploaded_file.name,
-                            "uploaded_at": datetime.now().isoformat(),
+                            "file_name": file_name,
+                            "uploaded_at": uploaded_at,
                             "uploaded_by_email": user_email
                         }).execute()
 
-                        st.success("🎉 Standard created and file uploaded! It is now visible to everyone.")
-                        st.balloons()
+                        if uploaded_file:
+                            st.success("🎉 Standard created with file! It is now visible to everyone.")
+                            st.balloons()
+                        else:
+                            st.success("🎉 Standard created successfully! You can upload the file later from 'All Standards'.")
+                        
                         st.rerun()
 
                     except Exception as e:
@@ -232,4 +243,4 @@ else:
             st.session_state.pop("uploading_standard_id", None)
             st.rerun()
 
-        st.caption("More profile features can be added later (edit info, change password, etc.)")
+        st.caption("More profile options can be added later.")
