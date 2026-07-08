@@ -1,8 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, timedelta
-from streamlit_cookies_controller import CookieController
-import json
+from datetime import datetime
 
 st.set_page_config(page_title="Simple Doc Portal", layout="centered")
 
@@ -14,64 +12,10 @@ def init_supabase():
     )
 
 supabase: Client = init_supabase()
-controller = CookieController()
 
-# ====================== PERSISTENT SESSION HELPERS ======================
-def restore_session_from_cookie():
-    """Restore Supabase session from browser cookie"""
-    cookie_value = controller.get("supabase_session")
-    
-    # TEMP DEBUG - remove later
-    if cookie_value:
-        st.toast(f"Cookie found (length: {len(cookie_value)})", icon="🔍")
-    else:
-        st.toast("No cookie found on refresh", icon="⚠️")
-        return False
-    
-    try:
-        session_data = json.loads(cookie_value)
-        supabase.auth.set_session(
-            session_data["access_token"],
-            session_data["refresh_token"]
-        )
-        user_response = supabase.auth.get_user()
-        
-        if user_response.user:
-            st.session_state.user = user_response.user
-            st.toast("Session restored successfully!", icon="✅")
-            return True
-        else:
-            st.toast("get_user() returned no user", icon="❌")
-            return False
-            
-    except Exception as e:
-        st.toast(f"Restore failed: {str(e)}", icon="❌")
-        controller.remove("supabase_session")
-        return False
-
-def save_session_to_cookie(session):
-    session_data = {
-        "access_token": session.access_token,
-        "refresh_token": session.refresh_token
-    }
-    controller.set(
-        "supabase_session",
-        json.dumps(session_data),
-        expires=datetime.now() + timedelta(days=7)
-    )
-    st.toast("Session saved to cookie", icon="💾")
-
-def clear_session_cookie():
-    controller.remove("supabase_session")
-
-# ====================== SESSION STATE ======================
 if "user" not in st.session_state:
     st.session_state.user = None
 
-if st.session_state.user is None:
-    restore_session_from_cookie()
-
-# ====================== LOGIN / SIGNUP ======================
 if st.session_state.user is None:
     st.title("🔐 Login to Portal")
     
@@ -84,7 +28,6 @@ if st.session_state.user is None:
         try:
             res = supabase.auth.sign_in_with_password({"email": email, "password": password})
             st.session_state.user = res.user
-            save_session_to_cookie(res.session)
             st.success("✅ Logged in successfully!")
             st.rerun()
         except Exception as e:
@@ -107,7 +50,6 @@ else:
     
     if st.button("Logout"):
         supabase.auth.sign_out()
-        clear_session_cookie()
         st.session_state.user = None
         st.rerun()
     
@@ -119,14 +61,16 @@ else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = f"{st.session_state.user.id}/{category}/{timestamp}_{uploaded_file.name}"
         
-            st.write("Debug - User ID:", st.session_state.user.id)
+            st.write("Debug - User ID:", st.session_state.user.id)   # ← New debug line
         
+         # Upload to Storage
             supabase.storage.from_("documents").upload(
                 file_path,
                 uploaded_file.getvalue(),
                 {"content-type": uploaded_file.type}
             )
         
+            # Save metadata
             result = supabase.table("documents").insert({
                 "user_id": st.session_state.user.id,
                 "file_name": uploaded_file.name,
@@ -136,7 +80,7 @@ else:
         
             st.success("🎉 File uploaded successfully!")
             st.balloons()
-            st.write("Insert result:", result)
+            st.write("Insert result:", result)   # ← New debug line
         
         except Exception as e:
             st.error(f"Upload error: {str(e)}")
