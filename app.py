@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime
 
-st.set_page_config(page_title="Simple Doc Portal", layout="centered")
+st.set_page_config(page_title="Standards Portal", layout="centered")
 
 @st.cache_resource
 def init_supabase():
@@ -39,20 +39,27 @@ if st.session_state.user is None:
                 "password": password,
                 "options": {"emailRedirectTo": "https://slmeval.streamlit.app"}
             })
-            st.success("✅ Signup successful! Please check your email to confirm, then log in.")
+            st.success("✅ Signup successful! Check your email then log in.")
         except Exception as e:
             st.error(f"Signup failed: {str(e)}")
 
 else:
-    # ============ LOGGED IN - NEW STANDARDS TABLE VIEW ============
-    st.title(f"Welcome, {st.session_state.user.email} 👋")
-    st.write("### 📋 Standards Document Portal")
+    # ============ SIDEBAR ============
+    with st.sidebar:
+        st.title("📋 Standards\nDocument Portal")
+        st.markdown(f"**Logged in as:**\n`{st.session_state.user.email}`")
+        st.divider()
+        st.caption("All standards are visible to everyone")
+
+    # ============ MAIN AREA ============
+    st.title(f"Welcome, {st.session_state.user.email.split('@')[0]} 👋")
 
     user_id = st.session_state.user.id
+    user_email = st.session_state.user.email
 
-    # --- Add new standard ---
-    with st.expander("➕ Add a New Standard", expanded=False):
-        new_name = st.text_input("Standard / Document Name", placeholder="e.g. Quality Manual v2")
+    # --- Add new standard (now visible to everyone) ---
+    with st.expander("➕ Add a New Standard (visible to everyone)", expanded=False):
+        new_name = st.text_input("Standard / Document Name")
         new_status = st.selectbox(
             "Initial Status",
             ["Pending", "In Progress", "Under Review", "Completed"],
@@ -64,43 +71,44 @@ else:
                     supabase.table("standards").insert({
                         "user_id": user_id,
                         "standard": new_name.strip(),
-                        "status": new_status
+                        "status": new_status,
+                        "uploaded_by_email": user_email
                     }).execute()
-                    st.success(f"✅ '{new_name}' added!")
+                    st.success(f"✅ '{new_name}' added and visible to everyone!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error adding standard: {str(e)}")
+                    st.error(f"Error: {str(e)}")
             else:
                 st.warning("Please enter a name.")
 
     st.divider()
 
-    # --- Display standards table ---
-    st.subheader("Your Standards")
+    # --- All Standards (visible to everyone) ---
+    st.subheader("📚 All Standards")
 
     try:
-        res = supabase.table("standards").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        res = supabase.table("standards").select("*").order("created_at", desc=True).execute()
         standards = res.data
     except Exception as e:
-        st.error(f"Failed to load data: {str(e)}")
+        st.error(f"Failed to load: {str(e)}")
         standards = []
 
     if not standards:
-        st.info("No standards yet. Add your first one using the expander above.")
+        st.info("No standards have been added yet.")
     else:
         for std in standards:
             std_id = std["id"]
             std_name = std["standard"]
             status = std.get("status", "Pending")
             file_path = std.get("file_path")
-            file_name = std.get("file_name")
+            uploaded_by = std.get("uploaded_by_email", "Unknown")
 
             with st.container(border=True):
                 c1, c2, c3, c4 = st.columns([4.5, 2, 2.5, 2])
 
-                # Standard name
+                # Standard name + uploader
                 c1.markdown(f"**{std_name}**")
-                c1.caption(f"Created: {str(std.get('created_at', ''))[:10]}")
+                c1.caption(f"Uploaded by: {uploaded_by}")
 
                 # Status
                 status_icon = {
@@ -111,38 +119,40 @@ else:
                 }.get(status, "⚪")
                 c2.markdown(f"{status_icon} **{status}**")
 
-                # PDF column (download or upload)
+                # File column
                 if file_path:
                     try:
-                        signed = supabase.storage.from_("documents").create_signed_url(file_path, 300)
-                        url = signed.get("signedURL") or signed.get("signed_url")
+                        signed_resp = supabase.storage.from_("documents").create_signed_url(file_path, 300)
+                        url = signed_resp.get("signedURL") or signed_resp.get("signed_url")
                         if url:
                             c3.link_button("📄 Download PDF", url, use_container_width=True)
                         else:
-                            c3.error("Link error")
-                    except Exception:
+                            c3.warning("Link error")
+                    except Exception as e:
                         c3.error("File unavailable")
+                        c3.caption(f"Debug: {str(e)}")
                 else:
-                    c3.markdown("📭 *No file uploaded*")
+                    c3.markdown("📭 *No file*")
                     if c4.button("📤 Upload File", key=f"upload_{std_id}", use_container_width=True):
                         st.session_state["uploading_standard_id"] = std_id
                         st.rerun()
 
-                # Delete button
-                if c4.button("🗑️ Delete", key=f"del_{std_id}", use_container_width=True, help="Delete this standard"):
-                    try:
-                        if file_path:
-                            try:
-                                supabase.storage.from_("documents").remove([file_path])
-                            except:
-                                pass
-                        supabase.table("standards").delete().eq("id", std_id).eq("user_id", user_id).execute()
-                        st.success("Deleted")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Delete failed: {str(e)}")
+                # Delete (only owner can delete)
+                if std.get("user_id") == user_id:
+                    if c4.button("🗑️ Delete", key=f"del_{std_id}", use_container_width=True, help="Delete this standard"):
+                        try:
+                            if file_path:
+                                try:
+                                    supabase.storage.from_("documents").remove([file_path])
+                                except:
+                                    pass
+                            supabase.table("standards").delete().eq("id", std_id).execute()
+                            st.success("Deleted")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Delete failed: {str(e)}")
 
-    # --- Upload section (appears when user clicks "Upload File" on a row) ---
+    # --- Upload section ---
     uploading_id = st.session_state.get("uploading_standard_id")
     if uploading_id:
         current = next((s for s in standards if s["id"] == uploading_id), None)
@@ -168,28 +178,25 @@ else:
                 safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in display_name).strip().replace(" ", "_")
                 new_path = f"{user_id}/standards/{safe_name}/{timestamp}_{uploaded_file.name}"
 
-                # Remove old file if exists
                 if current and current.get("file_path"):
                     try:
                         supabase.storage.from_("documents").remove([current["file_path"]])
                     except:
                         pass
 
-                # Upload new file
                 supabase.storage.from_("documents").upload(
                     new_path,
                     uploaded_file.getvalue(),
                     {"content-type": uploaded_file.type}
                 )
 
-                # Update standards table
                 supabase.table("standards").update({
                     "file_path": new_path,
                     "file_name": uploaded_file.name,
                     "uploaded_at": datetime.now().isoformat()
-                }).eq("id", uploading_id).eq("user_id", user_id).execute()
+                }).eq("id", uploading_id).execute()
 
-                st.success("🎉 File uploaded successfully!")
+                st.success("🎉 File uploaded and now visible to everyone!")
                 st.balloons()
                 st.session_state["uploading_standard_id"] = None
                 st.rerun()
