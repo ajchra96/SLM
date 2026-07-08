@@ -60,25 +60,24 @@ else:
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = f"{st.session_state.user.id}/{category}/{timestamp}_{uploaded_file.name}"
-            
-            # Upload to Storage
+        
+            # Upload file to Storage
             supabase.storage.from_("documents").upload(
-                file_path, 
-                uploaded_file.getvalue(), 
+                file_path,
+                uploaded_file.getvalue(),
                 {"content-type": uploaded_file.type}
             )
-            
-            # Save metadata - make sure user_id is correct
+        
+            # Save metadata (using returning="minimal" to avoid RLS issues)
             result = supabase.table("documents").insert({
                 "user_id": st.session_state.user.id,
                 "file_name": uploaded_file.name,
                 "file_path": file_path,
                 "uploaded_at": datetime.now().isoformat()
-            }).execute()
-            
+            }, returning="minimal").execute()
+        
             st.success("🎉 File uploaded successfully!")
             st.balloons()
-            st.write("Debug:", result)  # temporary
-            
+        
         except Exception as e:
             st.error(f"Upload error: {str(e)}")
