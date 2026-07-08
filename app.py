@@ -44,7 +44,7 @@ def save_session_to_cookie(session):
     controller.set(
         "supabase_session",
         json.dumps(session_data),
-        expires_at=datetime.now() + timedelta(days=7)
+        expires=datetime.now() + timedelta(days=7)   # ← FIXED
     )
 
 def clear_session_cookie():
