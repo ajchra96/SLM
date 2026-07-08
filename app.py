@@ -18,25 +18,38 @@ controller = CookieController()
 
 # ====================== PERSISTENT SESSION HELPERS ======================
 def restore_session_from_cookie():
-    """Restore Supabase session from browser cookie (persists across refresh)"""
+    """Restore Supabase session from browser cookie"""
     cookie_value = controller.get("supabase_session")
+    
+    # TEMP DEBUG - remove later
     if cookie_value:
-        try:
-            session_data = json.loads(cookie_value)
-            supabase.auth.set_session(
-                session_data["access_token"],
-                session_data["refresh_token"]
-            )
-            user_response = supabase.auth.get_user()
-            if user_response.user:
-                st.session_state.user = user_response.user
-                return True
-        except Exception:
-            controller.remove("supabase_session")
-    return False
+        st.toast(f"Cookie found (length: {len(cookie_value)})", icon="🔍")
+    else:
+        st.toast("No cookie found on refresh", icon="⚠️")
+        return False
+    
+    try:
+        session_data = json.loads(cookie_value)
+        supabase.auth.set_session(
+            session_data["access_token"],
+            session_data["refresh_token"]
+        )
+        user_response = supabase.auth.get_user()
+        
+        if user_response.user:
+            st.session_state.user = user_response.user
+            st.toast("Session restored successfully!", icon="✅")
+            return True
+        else:
+            st.toast("get_user() returned no user", icon="❌")
+            return False
+            
+    except Exception as e:
+        st.toast(f"Restore failed: {str(e)}", icon="❌")
+        controller.remove("supabase_session")
+        return False
 
 def save_session_to_cookie(session):
-    """Save access + refresh tokens to cookie so login survives refresh"""
     session_data = {
         "access_token": session.access_token,
         "refresh_token": session.refresh_token
@@ -44,8 +57,9 @@ def save_session_to_cookie(session):
     controller.set(
         "supabase_session",
         json.dumps(session_data),
-        expires=datetime.now() + timedelta(days=7)   # ← FIXED
+        expires=datetime.now() + timedelta(days=7)
     )
+    st.toast("Session saved to cookie", icon="💾")
 
 def clear_session_cookie():
     controller.remove("supabase_session")
@@ -54,7 +68,6 @@ def clear_session_cookie():
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# Try to restore session from cookie on every rerun/refresh
 if st.session_state.user is None:
     restore_session_from_cookie()
 
@@ -71,7 +84,7 @@ if st.session_state.user is None:
         try:
             res = supabase.auth.sign_in_with_password({"email": email, "password": password})
             st.session_state.user = res.user
-            save_session_to_cookie(res.session)          # ← persist login
+            save_session_to_cookie(res.session)
             st.success("✅ Logged in successfully!")
             st.rerun()
         except Exception as e:
@@ -89,13 +102,12 @@ if st.session_state.user is None:
             st.error(f"Signup failed: {str(e)}")
 
 else:
-    # ====================== LOGGED IN VIEW ======================
     st.title(f"Welcome, {st.session_state.user.email} 👋")
     st.write("Document Upload Portal")
     
     if st.button("Logout"):
         supabase.auth.sign_out()
-        clear_session_cookie()                           # ← clear persisted session
+        clear_session_cookie()
         st.session_state.user = None
         st.rerun()
     
@@ -107,16 +119,14 @@ else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = f"{st.session_state.user.id}/{category}/{timestamp}_{uploaded_file.name}"
         
-            st.write("Debug - User ID:", st.session_state.user.id)   # ← New debug line
+            st.write("Debug - User ID:", st.session_state.user.id)
         
-            # Upload to Storage
             supabase.storage.from_("documents").upload(
                 file_path,
                 uploaded_file.getvalue(),
                 {"content-type": uploaded_file.type}
             )
         
-            # Save metadata
             result = supabase.table("documents").insert({
                 "user_id": st.session_state.user.id,
                 "file_name": uploaded_file.name,
@@ -126,7 +136,7 @@ else:
         
             st.success("🎉 File uploaded successfully!")
             st.balloons()
-            st.write("Insert result:", result)   # ← New debug line
+            st.write("Insert result:", result)
         
         except Exception as e:
             st.error(f"Upload error: {str(e)}")
