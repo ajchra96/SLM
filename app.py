@@ -5,7 +5,7 @@ from datetime import datetime
 # ====================== CONFIG ======================
 st.set_page_config(page_title="Simple Doc Portal", layout="centered")
 
-# Initialize Supabase (cached)
+# Initialize Supabase
 @st.cache_resource
 def init_supabase():
     return create_client(
@@ -33,7 +33,7 @@ if st.session_state.user is None:
         else:
             try:
                 res = supabase.auth.sign_in_with_password({
-                    "email": email, 
+                    "email": email,
                     "password": password
                 })
                 st.session_state.user = res.user
@@ -49,12 +49,9 @@ if st.session_state.user is None:
             try:
                 res = supabase.auth.sign_up({
                     "email": email,
-                    "password": password,
+                    "password": password
                 })
                 st.success("✅ Signup successful! You can now log in.")
-                # Optional: auto-login if confirmation is disabled
-                # st.session_state.user = res.user
-                # st.rerun()
             except Exception as e:
                 st.error(f"❌ Signup failed: {str(e)}")
 
@@ -87,7 +84,7 @@ else:
                 {"content-type": uploaded_file.type}
             )
             
-            # Save metadata
+            # Save metadata to database
             supabase.table("documents").insert({
                 "user_id": st.session_state.user.id,
                 "file_name": uploaded_file.name,
