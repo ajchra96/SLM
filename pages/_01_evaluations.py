@@ -35,22 +35,28 @@ def show_evaluation_grid():
 
                 if st.button("Open →", key=f"open_{name}", use_container_width=True):
                     st.session_state.selected_evaluation = name
+                    # Clear any previous standard selection when changing evaluation
+                    st.session_state.pop("selected_standard_id", None)
                     st.rerun()
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
-    """Dedicated view with proper category filtering"""
+    """Dedicated view with sidebar of unique standards (ordered by 'orden') 
+    and right panel showing related component details (from 'componente' column or standard info).
+    Upload section remains for the selected item (now associated with componente concept).
+    """
     col1, col2 = st.columns([1, 5])
     with col1:
         if st.button("← Back to Evaluations", use_container_width=True):
             st.session_state.pop("selected_evaluation", None)
+            st.session_state.pop("selected_standard_id", None)
             st.rerun()
     with col2:
         st.title(f"📁 {evaluation_name}")
 
-    st.caption(f"Standards in the **{evaluation_name}** category")
+    st.caption(f"Standards in the **{evaluation_name}** category. Click a standard on the left to view its details and components on the right.")
 
-    # Proper filtering by category
+    # Load standards (now ordered by 'orden' asc in db.py)
     standards = get_standards(category=evaluation_name)
 
     if not standards:
@@ -59,74 +65,142 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
 
     user_id = user["id"]
 
-    for std in standards:
-        std_id = std["id"]
-        std_name = std["standard"]
-        status = std.get("status", "Pending")
-        file_path = std.get("file_path")
-        uploaded_by = std.get("uploaded_by_email", "Unknown")
+    # Ensure sorted by 'orden' numeric ascending (db already tries, but double-check here)
+    def get_orden_key(s):
+        try:
+            o = s.get("orden")
+            return int(o) if o is not None else 999999
+        except (ValueError, TypeError):
+            return 999999
+    standards_sorted = sorted(standards, key=get_orden_key)
 
-        with st.container(border=True):
-            c1, c2, c3, c4 = st.columns([4.5, 2, 2.5, 2])
-            c1.markdown(f"**{std_name}**")
-            c1.caption(f"Uploaded by: {uploaded_by}")
+    # Two column layout: left = sidebar with standards list, right = selected detail / components view
+    sidebar_col, content_col = st.columns([1.2, 3.5], gap="medium")
 
-            status_icon = {
-                "Completed": "🟢", "In Progress": "🟡",
-                "Under Review": "🔵", "Pending": "⚪"
-            }.get(status, "⚪")
-            c2.markdown(f"{status_icon} **{status}**")
-
-            if file_path:
-                url = get_signed_url(file_path)
-                if url:
-                    c3.link_button("📄 Download", url, use_container_width=True)
+    with sidebar_col:
+        st.markdown("### 📋 Standards")
+        st.caption("Ordered by 'orden' ↑")
+        if not standards_sorted:
+            st.write("No standards.")
+        else:
+            for std in standards_sorted:
+                std_id = std["id"]
+                std_name = std.get("standard", "Unnamed")
+                orden_val = std.get("orden", "")
+                # Label with orden if present
+                if orden_val not in (None, "", "None"):
+                    label = f"{orden_val}. {std_name}"
                 else:
-                    c3.warning("Link error")
-            else:
-                c3.markdown("📭 *No file*")
+                    label = std_name
+                # Use button for click-to-select
+                if st.button(label, key=f"sidebar_std_{std_id}", use_container_width=True):
+                    st.session_state.selected_standard_id = std_id
+                    st.rerun()
 
-            if c4.button("📤 Upload File", key=f"upload_{std_id}", use_container_width=True):
-                st.session_state["uploading_standard_id"] = std_id
+        # Optional: button to clear selection
+        if st.session_state.get("selected_standard_id"):
+            if st.button("Clear Selection", use_container_width=True):
+                st.session_state.pop("selected_standard_id", None)
                 st.rerun()
 
-            if std.get("user_id") == user_id:
-                if c4.button("🗑️ Delete", key=f"del_{std_id}", use_container_width=True):
-                    if delete_standard(std_id, file_path):
-                        st.success("Deleted")
-                        st.rerun()
+    with content_col:
+        selected_id = st.session_state.get("selected_standard_id")
+        if not selected_id:
+            st.info("👈 Select a standard from the left sidebar to see its related components and details here.")
+            # Optionally show a summary of all or first few
+            st.markdown("#### All Standards Overview (click one on left for focused view)")
+            for std in standards_sorted[:5]:  # preview first few
+                st.markdown(f"- **{std.get('standard')}** (orden: {std.get('orden', 'N/A')})")
+            if len(standards_sorted) > 5:
+                st.caption(f"... and {len(standards_sorted)-5} more. Select one for details.")
+            return
 
-    # File upload to existing standard
-    uploading_id = st.session_state.get("uploading_standard_id")
-    if uploading_id:
-        current = next((s for s in standards if s["id"] == uploading_id), None)
-        if current:
+        # Find selected standard
+        current = next((s for s in standards if s["id"] == selected_id), None)
+        if not current:
+            st.error("Selected standard not found. Please select again from sidebar.")
+            st.session_state.pop("selected_standard_id", None)
+            st.rerun()
+            return
+
+        std_id = current["id"]
+        std_name = current.get("standard", "Unnamed")
+        status = current.get("status", "Pending")
+        file_path = current.get("file_path")
+        uploaded_by = current.get("uploaded_by_email", "Unknown")
+        componente = current.get("componente")  # New/optional column for component name
+
+        # Header for selected
+        st.markdown(f"## {std_name}")
+        if componente:
+            st.markdown(f"**Componente:** {componente}")
+        st.caption(f"Uploaded by: {uploaded_by}")
+
+        # Status display
+        status_icon = {
+            "Completed": "🟢", "In Progress": "🟡",
+            "Under Review": "🔵", "Pending": "⚪"
+        }.get(status, "⚪")
+        st.markdown(f"### {status_icon} Status: **{status}**")
+
+        # File / Download section
+        st.divider()
+        if file_path:
+            url = get_signed_url(file_path)
+            if url:
+                st.link_button("📄 Download File", url, use_container_width=True)
+            else:
+                st.warning("Could not generate download link.")
+        else:
+            st.info("📭 No file uploaded yet for this item.")
+
+        # Upload section (the part where they upload things - now referenced as componente column context)
+        st.divider()
+        st.markdown("### 📤 Upload / Replace File (Componente)")
+        if st.button("📤 Upload File", key=f"upload_{std_id}", use_container_width=True):
+            st.session_state["uploading_standard_id"] = std_id
+            st.rerun()
+
+        # Delete if owner
+        if current.get("user_id") == user_id:
+            if st.button("🗑️ Delete this Standard/Componente", key=f"del_{std_id}", use_container_width=True):
+                if delete_standard(std_id, file_path):
+                    st.success("Deleted successfully")
+                    st.session_state.pop("selected_standard_id", None)
+                    st.rerun()
+
+        # File upload modal-like section if triggered
+        uploading_id = st.session_state.get("uploading_standard_id")
+        if uploading_id == std_id:
             st.divider()
-            st.markdown(f"### 📤 Upload / Replace file for **{current['standard']}**")
-
+            st.markdown(f"#### 📤 Upload / Replace file for **{std_name}**" + (f" (Componente: {componente})" if componente else ""))
             uploaded_file = st.file_uploader(
                 "Choose a file",
                 type=["pdf", "docx", "png", "jpg", "jpeg"],
                 key=f"uploader_{uploading_id}"
             )
-
             col_cancel, col_confirm = st.columns(2)
             if col_cancel.button("❌ Cancel", key=f"cancel_{uploading_id}"):
                 st.session_state.pop("uploading_standard_id", None)
                 st.rerun()
-
             if uploaded_file and col_confirm.button("✅ Confirm Upload", type="primary"):
                 if upload_file_to_standard(
                     standard_id=uploading_id,
                     user_id=user_id,
-                    display_name=current["standard"],
+                    display_name=std_name,
                     uploaded_file=uploaded_file,
                     current_file_path=current.get("file_path")
                 ):
-                    st.success("🎉 File uploaded!")
+                    st.success("🎉 File uploaded successfully!")
                     st.balloons()
                     st.session_state.pop("uploading_standard_id", None)
                     st.rerun()
+
+        # Show other fields if any (for future extensibility, e.g. more component metadata)
+        other_fields = {k: v for k, v in current.items() if k not in ["id", "standard", "componente", "status", "file_path", "file_name", "uploaded_at", "uploaded_by_email", "category", "user_id", "created_at", "orden"]}
+        if other_fields:
+            with st.expander("Additional Data"):
+                st.json(other_fields)
 
 
 def show_evaluations_page(user: dict):

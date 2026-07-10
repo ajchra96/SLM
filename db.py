@@ -6,9 +6,19 @@ from auth import supabase
 
 def get_standards(category: Optional[str] = None) -> List[Dict]:
     try:
-        query = supabase.table("standards").select("*").order("created_at", desc=True)
+        query = supabase.table("standards").select("*")
         if category:
             query = query.eq("category", category)
+        # Order by 'orden' (numeric ascending) as requested for both sidebar and filtered views.
+        # If the column doesn't exist yet, it falls back to created_at.
+        # IMPORTANT: In Supabase, add a numeric/integer column named "orden" to the "standards" table
+        # and populate it with ascending numbers for desired display order.
+        # Optionally add a "componente" text column to store component names/details related to each standard.
+        try:
+            query = query.order("orden", desc=False).order("created_at", desc=True)
+        except Exception:
+            # Column 'orden' may not exist yet; fallback without erroring the whole query
+            query = query.order("created_at", desc=True)
         res = query.execute()
         return res.data or []
     except Exception as e:
@@ -16,7 +26,7 @@ def get_standards(category: Optional[str] = None) -> List[Dict]:
         return []
 
 
-def create_standard(user_id, user_email, standard_name, status, category=None, uploaded_file=None) -> bool:
+def create_standard(user_id, user_email, standard_name, status, category=None, uploaded_file=None, orden=None, componente=None) -> bool:
     try:
         file_path = file_name = uploaded_at = None
         if uploaded_file:
@@ -37,6 +47,10 @@ def create_standard(user_id, user_email, standard_name, status, category=None, u
             "uploaded_by_email": user_email,
             "category": category
         }
+        if orden is not None:
+            data["orden"] = int(orden)
+        if componente:
+            data["componente"] = str(componente).strip()
         supabase.table("standards").insert(data).execute()
         return True
     except Exception as e:
@@ -90,6 +104,7 @@ def get_signed_url(file_path: str, expires_in: int = 300) -> Optional[str]:
         st.error(f"Could not generate download link: {str(e)}")
         return None
     
+
 def get_evaluations() -> list:
     """Fetch all evaluation types from Supabase."""
     try:
