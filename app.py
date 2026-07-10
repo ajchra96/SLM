@@ -1,7 +1,7 @@
 import streamlit as st
 from auth import init_supabase, get_current_user, login, signup, logout
 
-st.set_page_config(page_title="Standards Portal", layout="centered")
+st.set_page_config(page_title="Standards Portal", layout="wide")
 
 init_supabase()
 
