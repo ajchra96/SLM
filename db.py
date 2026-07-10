@@ -9,20 +9,28 @@ def get_standards(category: Optional[str] = None) -> List[Dict]:
         query = supabase.table("standards").select("*")
         if category:
             query = query.eq("category", category)
-        # Order by 'orden' (numeric ascending) as requested for both sidebar and filtered views.
-        # If the column doesn't exist yet, it falls back to created_at.
-        # IMPORTANT: In Supabase, add a numeric/integer column named "orden" to the "standards" table
-        # and populate it with ascending numbers for desired display order.
-        # Optionally add a "componente" text column to store component names/details related to each standard.
+        # Order by 'orden' (numeric ascending)
         try:
             query = query.order("orden", desc=False).order("created_at", desc=True)
         except Exception:
-            # Column 'orden' may not exist yet; fallback without erroring the whole query
             query = query.order("created_at", desc=True)
         res = query.execute()
         return res.data or []
     except Exception as e:
         st.error(f"Failed to load standards: {str(e)}")
+        return []
+
+
+def get_unique_standards_for_category(category: str) -> List[str]:
+    """Return sorted unique 'standard' (group) names for the dropdown in Add page."""
+    if not category:
+        return []
+    try:
+        res = supabase.table("standards").select("standard").eq("category", category).execute()
+        unique = sorted({row.get("standard") for row in (res.data or []) if row.get("standard")})
+        return unique
+    except Exception as e:
+        st.error(f"Failed to load existing standards for category: {str(e)}")
         return []
 
 
@@ -51,6 +59,7 @@ def create_standard(user_id, user_email, standard_name, status, category=None, u
             data["orden"] = int(orden)
         if componente:
             data["componente"] = str(componente).strip()
+
         supabase.table("standards").insert(data).execute()
         return True
     except Exception as e:
@@ -103,10 +112,9 @@ def get_signed_url(file_path: str, expires_in: int = 300) -> Optional[str]:
     except Exception as e:
         st.error(f"Could not generate download link: {str(e)}")
         return None
-    
+
 
 def get_evaluations() -> list:
-    """Fetch all evaluation types from Supabase."""
     try:
         res = supabase.table("evaluations").select("*").order("name").execute()
         return res.data or []
@@ -116,7 +124,6 @@ def get_evaluations() -> list:
 
 
 def create_evaluation(name: str, icon: str = "", description: str = "", user_id: str = None) -> bool:
-    """Create a new evaluation type."""
     try:
         data = {
             "name": name.strip(),
