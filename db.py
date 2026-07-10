@@ -89,3 +89,28 @@ def get_signed_url(file_path: str, expires_in: int = 300) -> Optional[str]:
     except Exception as e:
         st.error(f"Could not generate download link: {str(e)}")
         return None
+    
+def get_evaluations() -> list:
+    """Fetch all evaluation types from Supabase."""
+    try:
+        res = supabase.table("evaluations").select("*").order("name").execute()
+        return res.data or []
+    except Exception as e:
+        st.error(f"Failed to load evaluations: {str(e)}")
+        return []
+
+
+def create_evaluation(name: str, icon: str = "", description: str = "", user_id: str = None) -> bool:
+    """Create a new evaluation type."""
+    try:
+        data = {
+            "name": name.strip(),
+            "icon": icon,
+            "description": description,
+            "created_by": user_id
+        }
+        supabase.table("evaluations").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Failed to create evaluation: {str(e)}")
+        return False

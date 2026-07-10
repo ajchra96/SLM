@@ -1,64 +1,64 @@
 import streamlit as st
-from db import get_standards, delete_standard, upload_file_to_standard, get_signed_url
-
-# Evaluation types (keep this in sync with the Add New Standard page)
-EVALUATIONS = [
-    {"name": "Quality Management", "icon": "📋", "description": "Quality standards and procedures"},
-    {"name": "Health & Safety", "icon": "🛡️", "description": "Health, safety and risk management"},
-    {"name": "Environmental", "icon": "🌍", "description": "Environmental and sustainability standards"},
-]
+from db import get_standards, delete_standard, upload_file_to_standard, get_signed_url, get_evaluations
 
 
 def show_evaluation_grid():
-    """Display nice clickable icon cards"""
+    """Display clickable icon cards loaded from Supabase"""
     st.title("📊 Evaluations")
     st.caption("Select an evaluation type to view its standards")
 
+    evaluations = get_evaluations()
+
+    if not evaluations:
+        st.info("No evaluation types found yet. Create some from the 'Add New Standard' page.")
+        return
+
     cols = st.columns(3)
 
-    for idx, eval_item in enumerate(EVALUATIONS):
+    for idx, ev in enumerate(evaluations):
         with cols[idx % 3]:
             with st.container(border=True):
-                st.markdown(
-                    f"<div style='text-align: center; font-size: 48px; margin: 10px 0;'>{eval_item['icon']}</div>",
-                    unsafe_allow_html=True
-                )
-                st.markdown(
-                    f"<h4 style='text-align: center; margin-bottom: 4px;'>{eval_item['name']}</h4>",
-                    unsafe_allow_html=True
-                )
-                st.caption(eval_item["description"])
+                icon = ev.get("icon") or "📁"
+                name = ev.get("name", "Unnamed")
+                description = ev.get("description") or ""
 
-                if st.button("Open →", key=f"open_{eval_item['name']}", use_container_width=True):
-                    st.session_state.selected_evaluation = eval_item["name"]
+                st.markdown(
+                    f"<div style='text-align: center; font-size: 48px; margin: 10px 0;'>{icon}</div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown(
+                    f"<h4 style='text-align: center; margin-bottom: 4px;'>{name}</h4>",
+                    unsafe_allow_html=True
+                )
+                if description:
+                    st.caption(description)
+
+                if st.button("Open →", key=f"open_{name}", use_container_width=True):
+                    st.session_state.selected_evaluation = name
                     st.rerun()
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
-    """Dedicated view for one evaluation type with proper category filtering"""
-    # Back button + header
+    """Dedicated view with proper category filtering"""
     col1, col2 = st.columns([1, 5])
     with col1:
         if st.button("← Back to Evaluations", use_container_width=True):
             st.session_state.pop("selected_evaluation", None)
             st.rerun()
     with col2:
-        icon = next((e["icon"] for e in EVALUATIONS if e["name"] == evaluation_name), "📁")
-        st.title(f"{icon} {evaluation_name}")
+        st.title(f"📁 {evaluation_name}")
 
     st.caption(f"Standards in the **{evaluation_name}** category")
 
-    # ✅ Clean filtering using the category column
+    # Proper filtering by category
     standards = get_standards(category=evaluation_name)
 
     if not standards:
         st.info(f"No standards found in the **{evaluation_name}** category yet.")
-        st.caption("You can add new standards for this category from the '➕ Add New Standard' page in the sidebar.")
         return
 
     user_id = user["id"]
 
-    # Render standards
     for std in standards:
         std_id = std["id"]
         std_name = std["standard"]
@@ -86,19 +86,17 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
             else:
                 c3.markdown("📭 *No file*")
 
-            # Upload file button
             if c4.button("📤 Upload File", key=f"upload_{std_id}", use_container_width=True):
                 st.session_state["uploading_standard_id"] = std_id
                 st.rerun()
 
-            # Delete button (only for owner)
             if std.get("user_id") == user_id:
                 if c4.button("🗑️ Delete", key=f"del_{std_id}", use_container_width=True):
                     if delete_standard(std_id, file_path):
                         st.success("Deleted")
                         st.rerun()
 
-    # File upload section (for existing standards)
+    # File upload to existing standard
     uploading_id = st.session_state.get("uploading_standard_id")
     if uploading_id:
         current = next((s for s in standards if s["id"] == uploading_id), None)
@@ -125,7 +123,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                     uploaded_file=uploaded_file,
                     current_file_path=current.get("file_path")
                 ):
-                    st.success("🎉 File uploaded / replaced!")
+                    st.success("🎉 File uploaded!")
                     st.balloons()
                     st.session_state.pop("uploading_standard_id", None)
                     st.rerun()
