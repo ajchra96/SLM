@@ -24,26 +24,39 @@ def format_lima_time(iso_string: str) -> str:
 
 
 def show_evaluation_grid():
+    """Display clickable icon cards loaded from Supabase"""
     st.title("📊 Evaluaciones")
     st.caption("Selecciona un tipo de evaluación para ver sus estándares")
 
     evaluations = get_evaluations()
+
     if not evaluations:
-        st.info("No hay tipos de evaluación todavía.")
+        st.info("No se encontraron tipos de evaluación. Créalos desde la página 'Agregar Estándar'.")
         return
 
     cols = st.columns(3)
+
     for idx, ev in enumerate(evaluations):
         with cols[idx % 3]:
             with st.container(border=True):
                 icon = ev.get("icon") or "📁"
                 name = ev.get("name", "Sin nombre")
+                description = ev.get("description") or ""
 
-                st.markdown(f"<div style='text-align:center; font-size:48px;'>{icon}</div>", unsafe_allow_html=True)
-                st.markdown(f"<h4 style='text-align:center;'>{name}</h4>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='text-align: center; font-size: 48px; margin: 10px 0;'>{icon}</div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown(
+                    f"<h4 style='text-align: center; margin-bottom: 4px;'>{name}</h4>",
+                    unsafe_allow_html=True
+                )
+                if description:
+                    st.caption(description)
 
                 if st.button("Abrir →", key=f"open_{name}", use_container_width=True):
                     st.session_state.selected_evaluation = name
+                    st.query_params["eval"] = name                    # ← NEW: Update URL
                     st.session_state.pop("selected_standard_id", None)
                     st.rerun()
 
@@ -79,14 +92,15 @@ def show_overview_table(standards, evaluation_name):
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
-    col1, col2 = st.columns([1, 6])
+    col1, col2 = st.columns([1, 5])
     with col1:
         if st.button("← Volver a Evaluaciones", use_container_width=True):
             st.session_state.pop("selected_evaluation", None)
-            st.session_state.pop("selected_standard_id", None)
+            st.query_params.pop("eval", None)         
             st.rerun()
     with col2:
-        st.title(f"📁 {evaluation_name}")
+        icon = next((e["icon"] for e in get_evaluations() if e["name"] == evaluation_name), "📁")
+        st.title(f"{icon} {evaluation_name}")
 
     standards = get_standards(category=evaluation_name)
     if not standards:
@@ -233,7 +247,19 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
 
 
 def show_evaluations_page(user: dict):
+    """Main entry point for the Evaluations section.
+    Now supports shareable links via ?eval= parameter.
+    """
+    # Priority: query_params > session_state
+    query_eval = st.query_params.get("eval")
+
+    if query_eval:
+        st.session_state.selected_evaluation = query_eval
+    elif "selected_evaluation" not in st.session_state:
+        st.session_state.selected_evaluation = None
+
     selected = st.session_state.get("selected_evaluation")
+
     if selected:
         show_evaluation_detail(user, selected)
     else:
