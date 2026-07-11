@@ -12,5 +12,5 @@ def show_profile_page(user: dict):
 
     st.divider()
 
-    if st.button("🚪 Logout", type="primary", width=True):
+    if st.button("🚪 Logout", type="primary", width='stretch'):
         logout()
