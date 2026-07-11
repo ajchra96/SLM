@@ -217,46 +217,24 @@ def get_max_orden_for_standard(standard_id: str) -> int:
         st.error(f"Failed to compute max orden for standard_id '{standard_id}': {str(e)}")
         return 0
     
-    # ====================== NEW HELPERS FOR AUTO ORDER ======================
+# ====================== AUTO-ORDER HELPERS ======================
 def get_max_orden_for_evaluation(category: str) -> int:
-    """Return the maximum 'orden' value among all standards in the given evaluation/category.
-    Returns 0 if none exist (so the first standard gets order 1).
-    """
     if not category:
         return 0
     try:
         res = supabase.table("standards").select("orden").eq("category", category).execute()
-        values = []
-        for row in (res.data or []):
-            o = row.get("orden")
-            if o is not None:
-                try:
-                    values.append(int(o))
-                except (ValueError, TypeError):
-                    pass
+        values = [int(r["orden"]) for r in (res.data or []) if r.get("orden") is not None]
         return max(values) if values else 0
-    except Exception as e:
-        st.error(f"Failed to compute max orden for evaluation '{category}': {str(e)}")
+    except Exception:
         return 0
 
 
 def get_max_orden_for_standard(standard_id: str) -> int:
-    """Return the maximum 'orden' value among all components for a given standard_id.
-    Returns 0 if none exist (so the first component gets order 1).
-    """
     if not standard_id:
         return 0
     try:
         res = supabase.table("components").select("orden").eq("standard_id", standard_id).execute()
-        values = []
-        for row in (res.data or []):
-            o = row.get("orden")
-            if o is not None:
-                try:
-                    values.append(int(o))
-                except (ValueError, TypeError):
-                    pass
+        values = [int(r["orden"]) for r in (res.data or []) if r.get("orden") is not None]
         return max(values) if values else 0
-    except Exception as e:
-        st.error(f"Failed to compute max orden for standard_id '{standard_id}': {str(e)}")
+    except Exception:
         return 0

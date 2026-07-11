@@ -11,32 +11,32 @@ from db import (
 
 
 def show_create_evaluation_form(user: dict):
-    """Reusable function to create a new evaluation type. Now placed FIRST in the flow."""
+    """Create evaluation form - uses English labels to avoid Streamlit encoding crash."""
     with st.form("create_evaluation_form", clear_on_submit=True):
         name = st.text_input(
-            "Nombre de la Evaluación",
-            placeholder="e.g. Seguridad de la Información",
+            "Evaluation Name",
+            placeholder="e.g. Information Security",
             key="eval_name_input"
         )
         icon = st.text_input(
-            "Ícono (emoji)",
+            "Icon (emoji)",
             placeholder="🔒",
             max_chars=5,
             key="eval_icon_input"
         )
         description = st.text_area(
-            "Descripción (opcional)",
+            "Description (optional)",
             key="eval_desc_input"
         )
 
         submitted = st.form_submit_button(
-            "Crear Tipo de Evaluación",
+            "Create Evaluation Type",
             use_container_width=True
         )
 
         if submitted:
             if not name.strip():
-                st.error("El nombre es obligatorio.")
+                st.error("Evaluation name is required.")
             else:
                 if create_evaluation(
                     name=name.strip(),
@@ -44,79 +44,78 @@ def show_create_evaluation_form(user: dict):
                     description=description.strip() if description else "",
                     user_id=user["id"]
                 ):
-                    st.success(f"✅ Evaluación '{name}' creada.")
+                    st.success(f"✅ Evaluation '{name}' created successfully!")
                     st.rerun()
 
 
 def show_add_new_standard_page(user: dict):
-    st.title("➕ Agregar Estándar o Componente")
+    st.title("➕ Add New Standard or Component")
     st.caption(
-        "Centralizamos aquí la creación de estructura. "
-        "Flujo recomendado: 1) Crear Evaluación → 2) Crear Estándar (orden auto) → 3) Agregar Componentes."
+        "Recommended flow: 1) Create Evaluation → 2) Create Standard (auto order) → 3) Add Components."
     )
 
     # ========== 1. CREATE EVALUATION (FIRST) ==========
-    st.subheader("1️⃣ Crear Nueva Evaluación (Tipo/Categoría)")
-    st.caption("Las evaluaciones agrupan los estándares. Créala primero.")
+    st.subheader("1️⃣ Create New Evaluation")
+    st.caption("Evaluations group your standards. Create one first.")
     show_create_evaluation_form(user)
     st.divider()
 
-    # Load evaluations
+    # Load evaluations for the rest of the page
     evaluations = get_evaluations()
     evaluation_names = [e["name"] for e in evaluations] if evaluations else []
 
-    # ========== 2. CREATE STANDARD (with auto max order +1) ==========
-    st.subheader("2️⃣ Crear Nuevo Estándar (Grupo)")
-    st.caption("El orden inicial se calcula automáticamente como (máximo actual de la evaluación + 1).")
+    # ========== 2. CREATE STANDARD (auto max order +1) ==========
+    st.subheader("2️⃣ Create New Standard (Group)")
+    st.caption("The initial order is automatically calculated as (max order in the evaluation + 1).")
 
     if not evaluation_names:
-        st.warning("No hay evaluaciones todavía. Crea una en la sección de arriba.")
+        st.warning("No evaluations exist yet. Create one above first.")
         std_category = None
         suggested_orden = 1
     else:
         std_category = st.selectbox(
-            "Tipo de Evaluación / Categoría",
+            "Evaluation / Category",
             options=evaluation_names,
             key="create_std_eval_select",
-            help="El estándar pertenecerá a esta evaluación."
+            help="The standard will belong to this evaluation."
         )
         if std_category:
             max_existing = get_max_orden_for_evaluation(std_category)
             suggested_orden = max_existing + 1
             st.info(
-                f"📌 **Orden inicial sugerido: {suggested_orden}** "
-                f"(máx actual en '{std_category}' = {max_existing} + 1). Puedes modificarlo."
+                f"📌 **Suggested initial order: {suggested_orden}** "
+                f"(current max in '{std_category}' = {max_existing} + 1). You can change it."
             )
         else:
             suggested_orden = 1
 
     with st.form("create_standard_form", clear_on_submit=True):
         std_name = st.text_input(
-            "Nombre del Estándar",
-            placeholder="e.g. Control de Accesos o Gestión de Calidad",
+            "Standard Name",
+            placeholder="e.g. Access Control or Quality Management",
             key="std_name_input"
         )
 
         if std_category:
-            st.markdown(f"**Evaluación seleccionada:** {std_category}")
+            st.markdown(f"**Selected Evaluation:** {std_category}")
 
         std_orden = st.number_input(
-            "Orden (posición dentro de la evaluación)",
+            "Order (position inside the evaluation)",
             min_value=1,
             value=suggested_orden,
             step=1,
             key="std_orden_input"
         )
         std_description = st.text_area(
-            "Descripción del Estándar (opcional)",
+            "Standard Description (optional)",
             key="std_desc_input"
         )
 
-        submitted = st.form_submit_button("Crear Estándar", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Create Standard", type="primary", use_container_width=True)
 
         if submitted:
             if not std_name.strip() or not std_category:
-                st.error("Nombre del Estándar y Tipo de Evaluación son obligatorios.")
+                st.error("Standard name and Evaluation are required.")
             else:
                 success = create_standard(
                     user_id=user["id"],
@@ -127,24 +126,24 @@ def show_add_new_standard_page(user: dict):
                     orden=int(std_orden)
                 )
                 if success:
-                    st.success(f"✅ Estándar '{std_name}' creado con orden {std_orden}.")
+                    st.success(f"✅ Standard '{std_name}' created with order {std_orden}.")
                     st.rerun()
 
     st.divider()
 
-    # ========== 3. ADD COMPONENT (Eval filter → Standard → auto order) ==========
-    st.subheader("3️⃣ Agregar Componente a un Estándar Existente")
+    # ========== 3. ADD COMPONENT ==========
+    st.subheader("3️⃣ Add Component to an Existing Standard")
     st.caption(
-        "Primero selecciona la Evaluación (filtra los estándares), "
-        "luego elige el estándar. El orden del componente se calcula automáticamente."
+        "First select the Evaluation (this filters the standards), "
+        "then pick the standard. Component order is calculated automatically."
     )
 
     if not evaluation_names:
-        st.info("Primero crea una Evaluación y un Estándar.")
+        st.info("Create an Evaluation and a Standard first.")
     else:
-        # Evaluation selector FIRST (filters standards)
+        # Evaluation selector first → filters standards
         comp_eval = st.selectbox(
-            "Seleccionar Evaluación (filtra estándares)",
+            "Select Evaluation (filters standards)",
             options=evaluation_names,
             key="comp_eval_filter_select"
         )
@@ -152,19 +151,19 @@ def show_add_new_standard_page(user: dict):
         standards_in_eval = get_standards(category=comp_eval) if comp_eval else []
 
         if not standards_in_eval:
-            st.warning(f"No hay estándares en '{comp_eval}'. Crea uno en la sección 2.")
+            st.warning(f"No standards in '{comp_eval}' yet. Create one in section 2.")
             selected_standard_id = None
             suggested_comp_orden = 1
         else:
             standard_options = {}
             for s in standards_in_eval:
-                label = f"{s.get('orden', '?')}. {s.get('standard', 'Sin nombre')}"
+                label = f"{s.get('orden', '?')}. {s.get('standard', 'Unnamed')}"
                 if s.get("id"):
                     label += f"  ({str(s['id'])[:8]}...)"
                 standard_options[label] = s["id"]
 
             selected_label = st.selectbox(
-                "Seleccionar Estándar",
+                "Select Standard",
                 options=list(standard_options.keys()),
                 key="comp_std_select"
             )
@@ -174,37 +173,37 @@ def show_add_new_standard_page(user: dict):
                 max_comp = get_max_orden_for_standard(selected_standard_id)
                 suggested_comp_orden = max_comp + 1
                 st.info(
-                    f"📌 **Orden inicial sugerido para el componente: {suggested_comp_orden}** "
-                    f"(máx actual de componentes de este estándar = {max_comp} + 1)"
+                    f"📌 **Suggested component order: {suggested_comp_orden}** "
+                    f"(current max for this standard = {max_comp} + 1)"
                 )
             else:
                 suggested_comp_orden = 1
 
         with st.form("add_component_form", clear_on_submit=True):
             comp_name = st.text_input(
-                "Nombre del Componente",
-                placeholder="e.g. Revisión de accesos de usuarios o Cláusula 4.2",
+                "Component Name",
+                placeholder="e.g. User Access Review or Clause 4.2",
                 key="comp_name_input"
             )
             comp_orden = st.number_input(
-                "Orden del Componente (dentro del estándar)",
+                "Component Order (inside the standard)",
                 min_value=1,
                 value=suggested_comp_orden,
                 step=1,
                 key="comp_orden_input"
             )
             comp_description = st.text_area(
-                "Descripción del Componente (opcional)",
+                "Component Description (optional)",
                 key="comp_desc_input"
             )
 
-            submitted = st.form_submit_button("Agregar Componente", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("Add Component", type="primary", use_container_width=True)
 
             if submitted:
                 if not comp_name.strip():
-                    st.error("El nombre del componente es obligatorio.")
+                    st.error("Component name is required.")
                 elif not selected_standard_id:
-                    st.error("Debes seleccionar un estándar válido.")
+                    st.error("Please select a valid standard.")
                 else:
                     if create_component(
                         standard_id=selected_standard_id,
@@ -213,8 +212,8 @@ def show_add_new_standard_page(user: dict):
                         description=comp_description.strip() if comp_description else "",
                         user_id=user["id"]
                     ):
-                        st.success(f"✅ Componente '{comp_name}' agregado con orden {comp_orden}.")
+                        st.success(f"✅ Component '{comp_name}' added with order {comp_orden}.")
                         st.rerun()
 
     st.divider()
-    st.caption("💡 Ve a la sección de Evaluaciones para ver la estructura ordenada y agregar evidencia.")
+    st.caption("💡 Go to the Evaluations section to see the full hierarchy (ordered by 'orden') and upload evidence.")
