@@ -51,7 +51,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         st.info("No hay estándares en esta evaluación todavía.")
         return
 
-    # === LEFT SIDEBAR: Standards ===
+    # Left Sidebar
     sidebar_col, content_col = st.columns([1.3, 3.2], gap="large")
 
     with sidebar_col:
@@ -66,7 +66,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         selected_standard_id = st.session_state.get("selected_standard_id")
 
         if not selected_standard_id:
-            st.info("👈 Selecciona un estándar del panel izquierdo para ver sus componentes.")
+            st.info("👈 Selecciona un estándar del panel izquierdo.")
             return
 
         current_standard = next((s for s in standards if s["id"] == selected_standard_id), None)
@@ -83,7 +83,6 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
             st.warning("Este estándar aún no tiene componentes.")
             return
 
-        # === COMPONENTS + EVIDENCE ===
         for comp in components:
             with st.container(border=True):
                 st.markdown(f"### {comp.get('name')}")
@@ -100,7 +99,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                     else:
                         st.markdown("**Estado actual:** ⚪ En Revisión")
 
-                # History (oldest first)
+                # History
                 if evidence_list:
                     with st.expander("📜 Historial", expanded=len(evidence_list) <= 3):
                         for ev in evidence_list:
@@ -115,17 +114,17 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                                 st.markdown(f"> {ev['review_comment']}")
                             st.divider()
 
-                # === ADD EVIDENCE / REVIEW FORM ===
+                # === IMPROVED FORM ===
                 st.markdown("#### ➕ Agregar evidencia o revisión")
 
-                with st.form(key=f"form_{comp['id']}", clear_on_submit=True):
-                    action_type = st.radio(
-                        "Tipo de acción",
-                        options=["Evidencia", "Revisión"],
-                        horizontal=True,
-                        help="Evidencia = solo subir archivo. Revisión = subir archivo + calificar."
-                    )
+                action_type = st.radio(
+                    "Tipo de acción",
+                    options=["Evidencia", "Revisión"],
+                    horizontal=True,
+                    key=f"action_type_{comp['id']}"
+                )
 
+                with st.form(key=f"form_{comp['id']}", clear_on_submit=True):
                     uploaded_file = st.file_uploader(
                         "Subir archivo (opcional)", 
                         type=["pdf", "docx", "png", "jpg", "jpeg"]
@@ -134,8 +133,9 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                     grade = None
                     if action_type == "Revisión":
                         grade = st.selectbox(
-                            "Grado", 
-                            ["", "Cumple", "Cumple Parcialmente", "No Cumple"]
+                            "Grado",
+                            ["", "Cumple", "Cumple Parcialmente", "No Cumple"],
+                            key=f"grade_{comp['id']}"
                         )
 
                     comment = st.text_area("Comentario / Observación")
@@ -146,7 +146,6 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                         file_path = None
                         file_name = None
 
-                        # Upload file to Supabase Storage
                         if uploaded_file:
                             try:
                                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -164,7 +163,6 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                             except Exception as e:
                                 st.error(f"Error al subir el archivo: {e}")
 
-                        # Save to database
                         if create_evidence(
                             component_id=comp["id"],
                             user_id=user["id"],
