@@ -79,7 +79,7 @@ def show_overview_table(standards, evaluation_name):
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
-    col1, col2 = st.columns([1, 5])
+    col1, col2 = st.columns([1, 6])
     with col1:
         if st.button("← Volver a Evaluaciones", use_container_width=True):
             st.session_state.pop("selected_evaluation", None)
@@ -105,7 +105,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
             st.rerun()
 
         for std in standards:
-            label = f"{std.get('orden', '')}. {std.get('standard', 'Sin nombre')}"
+            label = f"{std.get('standard', 'Sin nombre')}"
             if st.button(label, key=f"std_{std['id']}", use_container_width=True):
                 st.session_state.selected_standard_id = std['id']
                 st.rerun()
