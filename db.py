@@ -1,240 +1,223 @@
-from datetime import datetime
-from typing import List, Dict, Optional
 import streamlit as st
+from datetime import datetime, timedelta
+from db import (
+    get_standards,
+    get_components_for_standard,
+    get_evidence_for_component,
+    create_evidence,
+    get_signed_url,
+    get_evaluations
+)
 from auth import supabase
 
 
-# ====================== STANDARDS ======================
-def get_standards(category: Optional[str] = None) -> List[Dict]:
+def format_lima_time(iso_string: str) -> str:
+    """Convert UTC to Lima time (GMT-5)"""
+    if not iso_string:
+        return ""
     try:
-        query = supabase.table("standards").select("*")
-        if category:
-            query = query.eq("category", category)
-        query = query.order("orden", desc=False).order("created_at", desc=True)
-        res = query.execute()
-        return res.data or []
-    except Exception as e:
-        st.error(f"Failed to load standards: {str(e)}")
-        return []
+        dt = datetime.fromisoformat(iso_string.replace("Z", "+00:00"))
+        lima_time = dt - timedelta(hours=5)
+        return lima_time.strftime("%d/%m/%Y %H:%M")
+    except:
+        return iso_string[:16]
 
 
-def create_standard(user_id, user_email, standard_name, status="Pending", category=None, 
-                    orden=100, uploaded_file=None) -> bool:
-    try:
-        file_path = file_name = uploaded_at = None
-        if uploaded_file:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in standard_name).strip().replace(" ", "_")
-            file_path = f"{user_id}/standards/{safe_name}/{timestamp}_{uploaded_file.name}"
-            supabase.storage.from_("documents").upload(file_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type})
-            file_name = uploaded_file.name
-            uploaded_at = datetime.now().isoformat()
+def show_evaluation_grid():
+    st.title("📊 Evaluaciones")
+    st.caption("Selecciona un tipo de evaluación para ver sus estándares")
 
-        data = {
-            "user_id": user_id,
-            "standard": standard_name.strip(),
-            "status": status,
-            "file_path": file_path,
-            "file_name": file_name,
-            "uploaded_at": uploaded_at,
-            "uploaded_by_email": user_email,
-            "category": category,
-            "orden": orden
-        }
-        supabase.table("standards").insert(data).execute()
-        return True
-    except Exception as e:
-        st.error(f"Error creating standard: {str(e)}")
-        return False
+    evaluations = get_evaluations()
 
+    if not evaluations:
+        st.info("No hay tipos de evaluación todavía.")
+        return
 
-# ====================== COMPONENTS ======================
-def get_components_for_standard(standard_id: str) -> List[Dict]:
-    try:
-        res = (supabase.table("components")
-               .select("*")
-               .eq("standard_id", standard_id)
-               .order("orden", desc=False)
-               .execute())
-        return res.data or []
-    except Exception as e:
-        st.error(f"Failed to load components: {str(e)}")
-        return []
+    cols = st.columns(3)
+
+    for idx, ev in enumerate(evaluations):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                icon = ev.get("icon") or "📁"
+                name = ev.get("name", "Sin nombre")
+
+                st.markdown(
+                    f"<div style='text-align:center; font-size:48px;'>{icon}</div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown(
+                    f"<h4 style='text-align:center;'>{name}</h4>",
+                    unsafe_allow_html=True
+                )
+
+                if st.button("Abrir →", key=f"open_{name}", width="stretch"):
+                    st.session_state.selected_evaluation = name
+                    st.session_state.pop("selected_standard_id", None)
+                    st.rerun()
 
 
-def create_component(standard_id: str, name: str, orden: int = 100, description: str = "", user_id: str = None) -> bool:
-    try:
-        data = {
-            "standard_id": standard_id,
-            "name": name.strip(),
-            "orden": orden,
-            "description": description.strip() if description else None,
-            "created_by": user_id
-        }
-        supabase.table("components").insert(data).execute()
-        return True
-    except Exception as e:
-        st.error(f"Error creating component: {str(e)}")
-        return False
+def show_overview_table(standards, evaluation_name):
+    st.markdown("### 📊 Resumen de Estándares")
+    if not standards:
+        st.info("No hay estándares en esta evaluación.")
+        return
+
+    table_data = []
+    for std in standards:
+        components = get_components_for_standard(std["id"])
+        total_components = len(components)
+        reviewed = 0
+        for comp in components:
+            evidence = get_evidence_for_component(comp["id"])
+            if any(ev.get("grade") for ev in evidence):
+                reviewed += 1
+        table_data.append({
+            "Estándar": std.get("standard", "Sin nombre"),
+            "Componentes": total_components,
+            "Revisados": reviewed,
+            "Progreso": f"{int((reviewed / total_components) * 100)}%" if total_components > 0 else "0%"
+        })
+    st.dataframe(table_data, width="stretch", hide_index=True)
 
 
-# ====================== EVIDENCE ======================
-def get_evidence_for_component(component_id: str) -> List[Dict]:
-    try:
-        res = (supabase.table("evidence")
-               .select("*")
-               .eq("component_id", component_id)
-               .order("created_at", desc=False)
-               .execute())
-        return res.data or []
-    except Exception as e:
-        st.error(f"Failed to load evidence: {str(e)}")
-        return []
+def show_evaluation_detail(user: dict, evaluation_name: str):
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("← Volver a Evaluaciones", width="stretch"):
+            st.session_state.pop("selected_evaluation", None)
+            st.session_state.pop("selected_standard_id", None)
+            st.rerun()
+    with col2:
+        st.title(f"📁 {evaluation_name}")
+
+    standards = get_standards(category=evaluation_name)
+
+    if not standards:
+        st.info("No hay estándares en esta evaluación todavía.")
+        return
+
+    # === LEFT SIDEBAR ===
+    sidebar_col, content_col = st.columns([1.3, 3.2], gap="large")
+    with sidebar_col:
+        st.markdown("### 📋 Estándares")
+        if st.button("📊 Ver Resumen General", width="stretch"):
+            st.session_state.pop("selected_standard_id", None)
+            st.rerun()
+
+        for std in standards:
+            label = f"{std.get('standard', 'Sin nombre')}"
+            if st.button(label, key=f"std_{std['id']}", width="stretch"):
+                st.session_state.selected_standard_id = std['id']
+                st.rerun()
+
+    with content_col:
+        selected_standard_id = st.session_state.get("selected_standard_id")
+
+        if not selected_standard_id:
+            show_overview_table(standards, evaluation_name)
+            return
+
+        current_standard = next((s for s in standards if s["id"] == selected_standard_id), None)
+        if not current_standard:
+            st.error("Estándar no encontrado.")
+            return
+
+        st.markdown(f"## {current_standard.get('standard')}")
+        if current_standard.get("description"):
+            st.caption(current_standard["description"])
+
+        components = get_components_for_standard(selected_standard_id)
+        if not components:
+            st.warning("Este estándar aún no tiene componentes.")
+            return
+
+        for comp in components:
+            with st.container(border=True):
+                st.markdown(f"### {comp.get('name')}")
+                evidence_list = get_evidence_for_component(comp["id"])
+
+                if evidence_list:
+                    latest = evidence_list[-1]
+                    grade = latest.get("grade")
+                    if grade:
+                        color = {"Cumple": "🟢", "Cumple Parcialmente": "🟡", "No Cumple": "🔴"}.get(grade, "⚪")
+                        st.markdown(f"**Estado actual:** {color} {grade}")
+                    else:
+                        st.markdown("**Estado actual:** ⚪ En Revisión")
+                else:
+                    st.markdown("**Estado actual:** ⚪ Sin evidencia")
+
+                if evidence_list:
+                    with st.expander("📜 Historial", expanded=len(evidence_list) <= 3):
+                        for ev in evidence_list:
+                            formatted_time = format_lima_time(ev.get("created_at", ""))
+                            st.markdown(f"**{formatted_time}**")
+                            if ev.get("file_name") and ev.get("file_path"):
+                                url = get_signed_url(ev["file_path"])
+                                if url:
+                                    st.markdown(f"📎 [{ev['file_name']}]({url})")
+                            if ev.get("grade"):
+                                st.markdown(f"**Grado:** {ev['grade']}")
+                            if ev.get("review_comment"):
+                                st.markdown(f"> {ev['review_comment']}")
+                            st.divider()
+
+                with st.expander("➕ Agregar evidencia o revisión", expanded=False):
+                    action_type = st.radio(
+                        "Tipo de acción",
+                        options=["Evidencia", "Revisión"],
+                        horizontal=True,
+                        key=f"action_type_{comp['id']}"
+                    )
+                    with st.form(key=f"form_{comp['id']}", clear_on_submit=True):
+                        uploaded_file = st.file_uploader(
+                            "Subir archivo (opcional)",
+                            type=["pdf", "docx", "png", "jpg", "jpeg"]
+                        )
+                        grade = None
+                        if action_type == "Revisión":
+                            grade = st.selectbox(
+                                "Grado",
+                                ["", "Cumple", "Cumple Parcialmente", "No Cumple"],
+                                key=f"grade_{comp['id']}"
+                            )
+                        comment = st.text_area("Comentario / Observación")
+                        submitted = st.form_submit_button("Guardar", type="primary")
+
+                        if submitted:
+                            file_path = None
+                            file_name = None
+                            if uploaded_file:
+                                try:
+                                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                    safe_name = "".join(
+                                        c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name
+                                    )
+                                    file_path = f"{user['id']}/evidence/{comp['id']}/{timestamp}_{safe_name}"
+                                    supabase.storage.from_("documents").upload(
+                                        file_path,
+                                        uploaded_file.getvalue(),
+                                        {"content-type": uploaded_file.type}
+                                    )
+                                    file_name = uploaded_file.name
+                                except Exception as e:
+                                    st.error(f"Error al subir el archivo: {e}")
+
+                            if create_evidence(
+                                component_id=comp["id"],
+                                user_id=user["id"],
+                                file_path=file_path,
+                                file_name=file_name,
+                                grade=grade if grade else None,
+                                review_comment=comment if comment else None
+                            ):
+                                st.success("✅ Guardado correctamente")
+                                st.rerun()
 
 
-def create_evidence(
-    component_id: str,
-    user_id: str,
-    file_path: Optional[str] = None,
-    file_name: Optional[str] = None,
-    grade: Optional[str] = None,
-    review_comment: Optional[str] = None
-) -> bool:
-    try:
-        # 1. Insert the new evidence
-        data = {
-            "component_id": component_id,
-            "uploaded_by": user_id,
-            "file_path": file_path,
-            "file_name": file_name,
-            "grade": grade,
-            "review_comment": review_comment.strip() if review_comment else None,
-            "reviewed_by": user_id if grade else None,
-            "reviewed_at": datetime.now().isoformat() if grade else None,
-        }
-        supabase.table("evidence").insert(data).execute()
-
-        # 2. Update the component's current_grade based on the latest evidence
-        # Get the latest evidence for this component
-        latest = (supabase.table("evidence")
-                  .select("grade")
-                  .eq("component_id", component_id)
-                  .order("created_at", desc=True)
-                  .limit(1)
-                  .execute())
-
-        latest_grade = None
-        if latest.data and latest.data[0].get("grade"):
-            latest_grade = latest.data[0]["grade"]
-
-        # Update component
-        supabase.table("components").update({
-            "current_grade": latest_grade
-        }).eq("id", component_id).execute()
-
-        return True
-
-    except Exception as e:
-        st.error(f"Error creating evidence: {str(e)}")
-        return False
-
-
-def get_signed_url(file_path: str, expires_in: int = 300) -> Optional[str]:
-    try:
-        signed_resp = supabase.storage.from_("documents").create_signed_url(file_path, expires_in)
-        return signed_resp.get("signedURL") or signed_resp.get("signed_url")
-    except Exception as e:
-        st.error(f"Could not generate download link: {str(e)}")
-        return None
-
-
-# ====================== EVALUATIONS ======================
-def get_evaluations() -> list:
-    try:
-        res = supabase.table("evaluations").select("*").order("name").execute()
-        return res.data or []
-    except Exception as e:
-        st.error(f"Failed to load evaluations: {str(e)}")
-        return []
-
-
-def create_evaluation(name: str, icon: str = "", description: str = "", user_id: str = None) -> bool:
-    try:
-        data = {
-            "name": name.strip(),
-            "icon": icon,
-            "description": description,
-            "created_by": user_id
-        }
-        supabase.table("evaluations").insert(data).execute()
-        return True
-    except Exception as e:
-        st.error(f"Failed to create evaluation: {str(e)}")
-        return False
-
-
-# ====================== NEW HELPERS FOR AUTO ORDER ======================
-def get_max_orden_for_evaluation(category: str) -> int:
-    """Return the maximum 'orden' value among all standards in the given evaluation/category.
-    Returns 0 if no standards exist yet (so first one gets order 1).
-    """
-    if not category:
-        return 0
-    try:
-        res = supabase.table("standards").select("orden").eq("category", category).execute()
-        values = []
-        for row in (res.data or []):
-            o = row.get("orden")
-            if o is not None:
-                try:
-                    values.append(int(o))
-                except (ValueError, TypeError):
-                    pass
-        return max(values) if values else 0
-    except Exception as e:
-        st.error(f"Failed to compute max orden for evaluation '{category}': {str(e)}")
-        return 0
-
-
-def get_max_orden_for_standard(standard_id: str) -> int:
-    """Return the maximum 'orden' value among all components belonging to the given standard_id.
-    Returns 0 if no components yet (so first component gets order 1).
-    """
-    if not standard_id:
-        return 0
-    try:
-        res = supabase.table("components").select("orden").eq("standard_id", standard_id).execute()
-        values = []
-        for row in (res.data or []):
-            o = row.get("orden")
-            if o is not None:
-                try:
-                    values.append(int(o))
-                except (ValueError, TypeError):
-                    pass
-        return max(values) if values else 0
-    except Exception as e:
-        st.error(f"Failed to compute max orden for standard_id '{standard_id}': {str(e)}")
-        return 0
-    
-# ====================== AUTO-ORDER HELPERS ======================
-def get_max_orden_for_evaluation(category: str) -> int:
-    if not category:
-        return 0
-    try:
-        res = supabase.table("standards").select("orden").eq("category", category).execute()
-        values = [int(r["orden"]) for r in (res.data or []) if r.get("orden") is not None]
-        return max(values) if values else 0
-    except Exception:
-        return 0
-
-
-def get_max_orden_for_standard(standard_id: str) -> int:
-    if not standard_id:
-        return 0
-    try:
-        res = supabase.table("components").select("orden").eq("standard_id", standard_id).execute()
-        values = [int(r["orden"]) for r in (res.data or []) if r.get("orden") is not None]
-        return max(values) if values else 0
-    except Exception:
-        return 0
+def show_evaluations_page(user: dict):
+    selected = st.session_state.get("selected_evaluation")
+    if selected:
+        show_evaluation_detail(user, selected)
+    else:
+        show_evaluation_grid()
