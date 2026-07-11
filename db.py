@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional
 import streamlit as st
 from auth import supabase
 
@@ -18,9 +18,38 @@ def get_standards(category: Optional[str] = None) -> List[Dict]:
         return []
 
 
+def create_standard(user_id, user_email, standard_name, status="Pending", category=None, 
+                    orden=100, uploaded_file=None) -> bool:
+    try:
+        file_path = file_name = uploaded_at = None
+        if uploaded_file:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in standard_name).strip().replace(" ", "_")
+            file_path = f"{user_id}/standards/{safe_name}/{timestamp}_{uploaded_file.name}"
+            supabase.storage.from_("documents").upload(file_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type})
+            file_name = uploaded_file.name
+            uploaded_at = datetime.now().isoformat()
+
+        data = {
+            "user_id": user_id,
+            "standard": standard_name.strip(),
+            "status": status,
+            "file_path": file_path,
+            "file_name": file_name,
+            "uploaded_at": uploaded_at,
+            "uploaded_by_email": user_email,
+            "category": category,
+            "orden": orden
+        }
+        supabase.table("standards").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error creating standard: {str(e)}")
+        return False
+
+
 # ====================== COMPONENTS ======================
 def get_components_for_standard(standard_id: str) -> List[Dict]:
-    """Get all components under a specific standard, ordered by orden."""
     try:
         res = (supabase.table("components")
                .select("*")
@@ -51,7 +80,6 @@ def create_component(standard_id: str, name: str, orden: int = 100, description:
 
 # ====================== EVIDENCE ======================
 def get_evidence_for_component(component_id: str) -> List[Dict]:
-    """Get evidence + reviews for a component. Oldest first (forum style)."""
     try:
         res = (supabase.table("evidence")
                .select("*")
@@ -64,15 +92,9 @@ def get_evidence_for_component(component_id: str) -> List[Dict]:
         return []
 
 
-def create_evidence(
-    component_id: str,
-    user_id: str,
-    file_path: Optional[str] = None,
-    file_name: Optional[str] = None,
-    grade: Optional[str] = None,
-    review_comment: Optional[str] = None
-) -> bool:
-    """Create a new evidence/review entry. File is optional."""
+def create_evidence(component_id: str, user_id: str, file_path: Optional[str] = None,
+                    file_name: Optional[str] = None, grade: Optional[str] = None,
+                    review_comment: Optional[str] = None) -> bool:
     try:
         data = {
             "component_id": component_id,
