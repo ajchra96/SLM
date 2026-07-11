@@ -56,7 +56,7 @@ def show_evaluation_grid():
 
                 if st.button("Abrir →", key=f"open_{name}", use_container_width=True):
                     st.session_state.selected_evaluation = name
-                    st.query_params["eval"] = name                    # ← NEW: Update URL
+                    st.query_params.from_dict({"eval": name})
                     st.session_state.pop("selected_standard_id", None)
                     st.rerun()
 
@@ -96,7 +96,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
     with col1:
         if st.button("← Volver a Evaluaciones", use_container_width=True):
             st.session_state.pop("selected_evaluation", None)
-            st.query_params.pop("eval", None)         
+            st.query_params.clear()    
             st.rerun()
     with col2:
         icon = next((e["icon"] for e in get_evaluations() if e["name"] == evaluation_name), "📁")
