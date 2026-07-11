@@ -28,60 +28,62 @@ def show_evaluation_grid():
     st.caption("Selecciona un tipo de evaluación para ver sus estándares")
 
     evaluations = get_evaluations()
+
     if not evaluations:
         st.info("No hay tipos de evaluación todavía.")
         return
 
     cols = st.columns(3)
+
     for idx, ev in enumerate(evaluations):
         with cols[idx % 3]:
             with st.container(border=True):
                 icon = ev.get("icon") or "📁"
                 name = ev.get("name", "Sin nombre")
 
-                st.markdown(f"<div style='text-align:center; font-size:48px;'>{icon}</div>", unsafe_allow_html=True)
-                st.markdown(f"<h4 style='text-align:center;'>{name}</h4>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='text-align:center; font-size:48px;'>{icon}</div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown(
+                    f"<h4 style='text-align:center;'>{name}</h4>",
+                    unsafe_allow_html=True
+                )
 
-                if st.button("Abrir →", key=f"open_{name}", use_container_width=True):
+                if st.button("Abrir →", key=f"open_{name}", width="stretch"):
                     st.session_state.selected_evaluation = name
                     st.session_state.pop("selected_standard_id", None)
                     st.rerun()
 
 
 def show_overview_table(standards, evaluation_name):
-    """Show summary table when no standard is selected"""
     st.markdown("### 📊 Resumen de Estándares")
-
     if not standards:
         st.info("No hay estándares en esta evaluación.")
         return
 
     table_data = []
-
     for std in standards:
         components = get_components_for_standard(std["id"])
         total_components = len(components)
         reviewed = 0
-
         for comp in components:
             evidence = get_evidence_for_component(comp["id"])
             if any(ev.get("grade") for ev in evidence):
                 reviewed += 1
-
         table_data.append({
             "Estándar": std.get("standard", "Sin nombre"),
             "Componentes": total_components,
             "Revisados": reviewed,
             "Progreso": f"{int((reviewed / total_components) * 100)}%" if total_components > 0 else "0%"
         })
-
-    st.dataframe(table_data, use_container_width=True, hide_index=True)
+    st.dataframe(table_data, width="stretch", hide_index=True)
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
     col1, col2 = st.columns([1, 6])
     with col1:
-        if st.button("← Volver a Evaluaciones", use_container_width=True):
+        if st.button("← Volver a Evaluaciones", width="stretch"):
             st.session_state.pop("selected_evaluation", None)
             st.session_state.pop("selected_standard_id", None)
             st.rerun()
@@ -89,36 +91,32 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         st.title(f"📁 {evaluation_name}")
 
     standards = get_standards(category=evaluation_name)
+
     if not standards:
         st.info("No hay estándares en esta evaluación todavía.")
         return
 
     # === LEFT SIDEBAR ===
     sidebar_col, content_col = st.columns([1.3, 3.2], gap="large")
-
     with sidebar_col:
         st.markdown("### 📋 Estándares")
-
-        # Button to go back to overview
-        if st.button("📊 Ver Resumen General", use_container_width=True):
+        if st.button("📊 Ver Resumen General", width="stretch"):
             st.session_state.pop("selected_standard_id", None)
             st.rerun()
 
         for std in standards:
             label = f"{std.get('standard', 'Sin nombre')}"
-            if st.button(label, key=f"std_{std['id']}", use_container_width=True):
+            if st.button(label, key=f"std_{std['id']}", width="stretch"):
                 st.session_state.selected_standard_id = std['id']
                 st.rerun()
 
     with content_col:
         selected_standard_id = st.session_state.get("selected_standard_id")
 
-        # === OVERVIEW TABLE ===
         if not selected_standard_id:
             show_overview_table(standards, evaluation_name)
             return
 
-        # === DETAIL VIEW ===
         current_standard = next((s for s in standards if s["id"] == selected_standard_id), None)
         if not current_standard:
             st.error("Estándar no encontrado.")
@@ -136,10 +134,8 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         for comp in components:
             with st.container(border=True):
                 st.markdown(f"### {comp.get('name')}")
-
                 evidence_list = get_evidence_for_component(comp["id"])
 
-                # Current status
                 if evidence_list:
                     latest = evidence_list[-1]
                     grade = latest.get("grade")
@@ -149,44 +145,35 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                     else:
                         st.markdown("**Estado actual:** ⚪ En Revisión")
                 else:
-                        st.markdown("**Estado actual:** ⚪ Sin evidencia")
+                    st.markdown("**Estado actual:** ⚪ Sin evidencia")
 
-                # History
                 if evidence_list:
                     with st.expander("📜 Historial", expanded=len(evidence_list) <= 3):
                         for ev in evidence_list:
                             formatted_time = format_lima_time(ev.get("created_at", ""))
                             st.markdown(f"**{formatted_time}**")
-
                             if ev.get("file_name") and ev.get("file_path"):
                                 url = get_signed_url(ev["file_path"])
                                 if url:
                                     st.markdown(f"📎 [{ev['file_name']}]({url})")
-
                             if ev.get("grade"):
                                 st.markdown(f"**Grado:** {ev['grade']}")
-
                             if ev.get("review_comment"):
                                 st.markdown(f"> {ev['review_comment']}")
-
                             st.divider()
 
-                # Add Evidence / Review (inside expander)
                 with st.expander("➕ Agregar evidencia o revisión", expanded=False):
-
                     action_type = st.radio(
                         "Tipo de acción",
                         options=["Evidencia", "Revisión"],
                         horizontal=True,
                         key=f"action_type_{comp['id']}"
                     )
-
                     with st.form(key=f"form_{comp['id']}", clear_on_submit=True):
                         uploaded_file = st.file_uploader(
-                            "Subir archivo (opcional)", 
+                            "Subir archivo (opcional)",
                             type=["pdf", "docx", "png", "jpg", "jpeg"]
                         )
-
                         grade = None
                         if action_type == "Revisión":
                             grade = st.selectbox(
@@ -194,15 +181,12 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                                 ["", "Cumple", "Cumple Parcialmente", "No Cumple"],
                                 key=f"grade_{comp['id']}"
                             )
-
                         comment = st.text_area("Comentario / Observación")
-
                         submitted = st.form_submit_button("Guardar", type="primary")
 
                         if submitted:
                             file_path = None
                             file_name = None
-
                             if uploaded_file:
                                 try:
                                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -210,7 +194,6 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                                         c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name
                                     )
                                     file_path = f"{user['id']}/evidence/{comp['id']}/{timestamp}_{safe_name}"
-
                                     supabase.storage.from_("documents").upload(
                                         file_path,
                                         uploaded_file.getvalue(),
