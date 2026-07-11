@@ -54,7 +54,7 @@ def show_evaluation_grid():
                 if description:
                     st.caption(description)
 
-                if st.button("Abrir →", key=f"open_{name}", use_container_width=True):
+                if st.button("Abrir →", key=f"open_{name}", width=True):
                     st.session_state.selected_evaluation = name
                     st.query_params.from_dict({"eval": name})
                     st.session_state.pop("selected_standard_id", None)
@@ -88,13 +88,13 @@ def show_overview_table(standards, evaluation_name):
             "Progreso": f"{int((reviewed / total_components) * 100)}%" if total_components > 0 else "0%"
         })
 
-    st.dataframe(table_data, use_container_width=True, hide_index=True)
+    st.dataframe(table_data, width=True, hide_index=True)
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
     col1, col2 = st.columns([1, 5])
     with col1:
-        if st.button("← Volver a Evaluaciones", use_container_width=True):
+        if st.button("← Volver a Evaluaciones", width=True):
             st.session_state.pop("selected_evaluation", None)
             st.query_params.clear()    
             st.rerun()
@@ -114,13 +114,13 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         st.markdown("### 📋 Estándares")
 
         # Button to go back to overview
-        if st.button("📊 Ver Resumen General", use_container_width=True):
+        if st.button("📊 Ver Resumen General", width=True):
             st.session_state.pop("selected_standard_id", None)
             st.rerun()
 
         for std in standards:
             label = f"{std.get('standard', 'Sin nombre')}"
-            if st.button(label, key=f"std_{std['id']}", use_container_width=True):
+            if st.button(label, key=f"std_{std['id']}", width=True):
                 st.session_state.selected_standard_id = std['id']
                 st.rerun()
 

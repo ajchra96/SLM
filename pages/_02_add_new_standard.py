@@ -31,7 +31,7 @@ def show_create_evaluation_form(user: dict):
 
         submitted = st.form_submit_button(
             "Crear Tipo de Evaluación",
-            use_container_width=True
+            width=True
         )
 
         if submitted:
@@ -111,7 +111,7 @@ def show_add_new_standard_page(user: dict):
             key="std_desc_input"
         )
 
-        submitted = st.form_submit_button("Crear Estándar", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Crear Estándar", type="primary", width=True)
 
         if submitted:
             if not std_name.strip() or not std_category:
@@ -197,7 +197,7 @@ def show_add_new_standard_page(user: dict):
                 key="comp_desc_input"
             )
 
-            submitted = st.form_submit_button("Agregar Componente", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("Agregar Componente", type="primary", width=True)
 
             if submitted:
                 if not comp_name.strip():

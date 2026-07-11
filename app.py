@@ -25,12 +25,12 @@ if user is None:
     password = st.text_input("Password", type="password", key="pass_input")
 
     col1, col2 = st.columns(2)
-    if col1.button("Login", use_container_width=True):
+    if col1.button("Login", width=True):
         if login(email, password):
             st.success("✅ Logged in successfully!")
             st.rerun()
 
-    if col2.button("Sign Up", use_container_width=True):
+    if col2.button("Sign Up", width=True):
         signup(email, password)
 
 else:
