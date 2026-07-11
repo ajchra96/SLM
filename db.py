@@ -4,16 +4,13 @@ import streamlit as st
 from auth import supabase
 
 
+# ====================== STANDARDS ======================
 def get_standards(category: Optional[str] = None) -> List[Dict]:
     try:
         query = supabase.table("standards").select("*")
         if category:
             query = query.eq("category", category)
-        # Order by 'orden' (numeric ascending)
-        try:
-            query = query.order("orden", desc=False).order("created_at", desc=True)
-        except Exception:
-            query = query.order("created_at", desc=True)
+        query = query.order("orden", desc=False).order("created_at", desc=True)
         res = query.execute()
         return res.data or []
     except Exception as e:
@@ -21,87 +18,76 @@ def get_standards(category: Optional[str] = None) -> List[Dict]:
         return []
 
 
-def get_unique_standards_for_category(category: str) -> List[str]:
-    """Return sorted unique 'standard' (group) names for the dropdown in Add page."""
-    if not category:
-        return []
+# ====================== COMPONENTS ======================
+def get_components_for_standard(standard_id: str) -> List[Dict]:
+    """Get all components under a specific standard, ordered by orden."""
     try:
-        res = supabase.table("standards").select("standard").eq("category", category).execute()
-        unique = sorted({row.get("standard") for row in (res.data or []) if row.get("standard")})
-        return unique
+        res = (supabase.table("components")
+               .select("*")
+               .eq("standard_id", standard_id)
+               .order("orden", desc=False)
+               .execute())
+        return res.data or []
     except Exception as e:
-        st.error(f"Failed to load existing standards for category: {str(e)}")
+        st.error(f"Failed to load components: {str(e)}")
         return []
 
 
-def create_standard(user_id, user_email, standard_name, status, category=None, uploaded_file=None, orden=None, componente=None) -> bool:
+def create_component(standard_id: str, name: str, orden: int = 100, description: str = "", user_id: str = None) -> bool:
     try:
-        file_path = file_name = uploaded_at = None
-        if uploaded_file:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in standard_name).strip().replace(" ", "_")
-            file_path = f"{user_id}/standards/{safe_name}/{timestamp}_{uploaded_file.name}"
-            supabase.storage.from_("documents").upload(file_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type})
-            file_name = uploaded_file.name
-            uploaded_at = datetime.now().isoformat()
-
         data = {
-            "user_id": user_id,
-            "standard": standard_name.strip(),
-            "status": status,
+            "standard_id": standard_id,
+            "name": name.strip(),
+            "orden": orden,
+            "description": description.strip() if description else None,
+            "created_by": user_id
+        }
+        supabase.table("components").insert(data).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error creating component: {str(e)}")
+        return False
+
+
+# ====================== EVIDENCE ======================
+def get_evidence_for_component(component_id: str) -> List[Dict]:
+    """Get evidence + reviews for a component. Oldest first (forum style)."""
+    try:
+        res = (supabase.table("evidence")
+               .select("*")
+               .eq("component_id", component_id)
+               .order("created_at", desc=False)
+               .execute())
+        return res.data or []
+    except Exception as e:
+        st.error(f"Failed to load evidence: {str(e)}")
+        return []
+
+
+def create_evidence(
+    component_id: str,
+    user_id: str,
+    file_path: Optional[str] = None,
+    file_name: Optional[str] = None,
+    grade: Optional[str] = None,
+    review_comment: Optional[str] = None
+) -> bool:
+    """Create a new evidence/review entry. File is optional."""
+    try:
+        data = {
+            "component_id": component_id,
+            "uploaded_by": user_id,
             "file_path": file_path,
             "file_name": file_name,
-            "uploaded_at": uploaded_at,
-            "uploaded_by_email": user_email,
-            "category": category
+            "grade": grade,
+            "review_comment": review_comment.strip() if review_comment else None,
+            "reviewed_by": user_id if grade else None,
+            "reviewed_at": datetime.now().isoformat() if grade else None,
         }
-        if orden is not None:
-            data["orden"] = int(orden)
-        if componente:
-            data["componente"] = str(componente).strip()
-
-        supabase.table("standards").insert(data).execute()
+        supabase.table("evidence").insert(data).execute()
         return True
     except Exception as e:
-        st.error(f"Error creating standard: {str(e)}")
-        return False
-
-
-def upload_file_to_standard(standard_id, user_id, display_name, uploaded_file, current_file_path=None) -> bool:
-    try:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in display_name).strip().replace(" ", "_")
-        new_path = f"{user_id}/standards/{safe_name}/{timestamp}_{uploaded_file.name}"
-
-        if current_file_path:
-            try:
-                supabase.storage.from_("documents").remove([current_file_path])
-            except:
-                pass
-
-        supabase.storage.from_("documents").upload(new_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type})
-        supabase.table("standards").update({
-            "file_path": new_path,
-            "file_name": uploaded_file.name,
-            "uploaded_at": datetime.now().isoformat()
-        }).eq("id", standard_id).execute()
-        return True
-    except Exception as e:
-        st.error(f"Upload failed: {str(e)}")
-        return False
-
-
-def delete_standard(standard_id: str, file_path: Optional[str] = None) -> bool:
-    try:
-        if file_path:
-            try:
-                supabase.storage.from_("documents").remove([file_path])
-            except:
-                pass
-        supabase.table("standards").delete().eq("id", standard_id).execute()
-        return True
-    except Exception as e:
-        st.error(f"Delete failed: {str(e)}")
+        st.error(f"Error creating evidence: {str(e)}")
         return False
 
 
@@ -114,6 +100,7 @@ def get_signed_url(file_path: str, expires_in: int = 300) -> Optional[str]:
         return None
 
 
+# ====================== EVALUATIONS ======================
 def get_evaluations() -> list:
     try:
         res = supabase.table("evaluations").select("*").order("name").execute()
