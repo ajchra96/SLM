@@ -41,18 +41,18 @@ else:
 
         page = st.radio(
             "Menu",
-            options=["📊 Evaluations", "➕ Add New Standard", "👤 Profile"],
+            options=["📊 Evaluaciones", "➕ Agregar evaluaciones", "👤 Usuario"],
             label_visibility="collapsed"
         )
 
-    if page == "📊 Evaluations":
+    if page == "📊 Evaluaciones":
         from pages._01_evaluations import show_evaluations_page
         show_evaluations_page(user)
 
-    elif page == "➕ Add New Standard":
+    elif page == "➕ Agregar evaluaciones":
         from pages._02_add_new_standard import show_add_new_standard_page
         show_add_new_standard_page(user)
 
-    elif page == "👤 Profile":
+    elif page == "👤 Usuario":
         from pages._03_profile import show_profile_page
         show_profile_page(user)
