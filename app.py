@@ -1,7 +1,16 @@
 import streamlit as st
 from auth import init_supabase, get_current_user, login, signup, logout
 
-st.set_page_config(page_title="Standards Portal", layout="wide")
+st.set_page_config(page_title="Standards Portal", layout="wide", initial_sidebar_state="expanded")
+
+# === Hide the automatic multipage navigation ===
+st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] {
+            display: none;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 init_supabase()
 
