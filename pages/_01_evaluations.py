@@ -148,6 +148,8 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                         st.markdown(f"**Estado actual:** {color} {grade}")
                     else:
                         st.markdown("**Estado actual:** ⚪ En Revisión")
+                else:
+                        st.markdown("**Estado actual:** ⚪ Sin evidencia")
 
                 # History
                 if evidence_list:

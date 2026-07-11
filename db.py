@@ -92,10 +92,16 @@ def get_evidence_for_component(component_id: str) -> List[Dict]:
         return []
 
 
-def create_evidence(component_id: str, user_id: str, file_path: Optional[str] = None,
-                    file_name: Optional[str] = None, grade: Optional[str] = None,
-                    review_comment: Optional[str] = None) -> bool:
+def create_evidence(
+    component_id: str,
+    user_id: str,
+    file_path: Optional[str] = None,
+    file_name: Optional[str] = None,
+    grade: Optional[str] = None,
+    review_comment: Optional[str] = None
+) -> bool:
     try:
+        # 1. Insert the new evidence
         data = {
             "component_id": component_id,
             "uploaded_by": user_id,
@@ -107,7 +113,27 @@ def create_evidence(component_id: str, user_id: str, file_path: Optional[str] = 
             "reviewed_at": datetime.now().isoformat() if grade else None,
         }
         supabase.table("evidence").insert(data).execute()
+
+        # 2. Update the component's current_grade based on the latest evidence
+        # Get the latest evidence for this component
+        latest = (supabase.table("evidence")
+                  .select("grade")
+                  .eq("component_id", component_id)
+                  .order("created_at", desc=True)
+                  .limit(1)
+                  .execute())
+
+        latest_grade = None
+        if latest.data and latest.data[0].get("grade"):
+            latest_grade = latest.data[0]["grade"]
+
+        # Update component
+        supabase.table("components").update({
+            "current_grade": latest_grade
+        }).eq("id", component_id).execute()
+
         return True
+
     except Exception as e:
         st.error(f"Error creating evidence: {str(e)}")
         return False
