@@ -80,26 +80,16 @@ def show_overview_table(standards, evaluation_name):
     st.dataframe(table_data, width="stretch", hide_index=True)
 
 
-def show_evaluation_detail(user: dict, evaluation_name: str):
-    col1, col2 = st.columns([1, 6])
-    with col1:
-        if st.button("← Volver a Evaluaciones", width="stretch"):
-            st.session_state.pop("selected_evaluation", None)
-            st.session_state.pop("selected_standard_id", None)
-            st.rerun()
-    with col2:
-        st.title(f"📁 {evaluation_name}")
-
-    standards = get_standards(category=evaluation_name)
-
-    if not standards:
-        st.info("No hay estándares en esta evaluación todavía.")
-        return
-
+@st.fragment
+def show_evaluation_detail_content(user: dict, evaluation_name: str, standards: list):
+    """Main content of the evaluation detail (wrapped in fragment)"""
+    
     # === LEFT SIDEBAR ===
     sidebar_col, content_col = st.columns([1.3, 3.2], gap="large")
+    
     with sidebar_col:
         st.markdown("### 📋 Estándares")
+        
         if st.button("📊 Ver Resumen General", width="stretch"):
             st.session_state.pop("selected_standard_id", None)
             st.rerun()
@@ -113,10 +103,12 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
     with content_col:
         selected_standard_id = st.session_state.get("selected_standard_id")
 
+        # === OVERVIEW TABLE ===
         if not selected_standard_id:
             show_overview_table(standards, evaluation_name)
             return
 
+        # === DETAIL VIEW ===
         current_standard = next((s for s in standards if s["id"] == selected_standard_id), None)
         if not current_standard:
             st.error("Estándar no encontrado.")
@@ -136,6 +128,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                 st.markdown(f"### {comp.get('name')}")
                 evidence_list = get_evidence_for_component(comp["id"])
 
+                # Current status
                 if evidence_list:
                     latest = evidence_list[-1]
                     grade = latest.get("grade")
@@ -147,6 +140,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                 else:
                     st.markdown("**Estado actual:** ⚪ Sin evidencia")
 
+                # History
                 if evidence_list:
                     with st.expander("📜 Historial", expanded=len(evidence_list) <= 3):
                         for ev in evidence_list:
@@ -162,6 +156,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                                 st.markdown(f"> {ev['review_comment']}")
                             st.divider()
 
+                # Add Evidence / Review
                 with st.expander("➕ Agregar evidencia o revisión", expanded=False):
                     action_type = st.radio(
                         "Tipo de acción",
@@ -215,9 +210,27 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                                 st.rerun()
 
 
-def show_evaluations_page(user: dict):
-    selected = st.session_state.get("selected_evaluation")
-    if selected:
-        show_evaluation_detail(user, selected)
-    else:
-        show_evaluation_grid()
+def show_evaluation_detail(user: dict, evaluation_name: str):
+    # Back button (outside fragment)
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        if st.button("← Volver a Evaluaciones", width="stretch"):
+            st.session_state.pop("selected_evaluation", None)
+            st.session_state.pop("selected_standard_id", None)
+            st.rerun()
+    with col2:
+        st.title(f"📁 {evaluation_name}")
+
+    # === ACTUALIZAR BUTTON ===
+    if st.button("🔄 Actualizar datos", width="stretch"):
+        st.rerun()
+
+    # Load standards (this runs when fragment re-runs or page loads)
+    standards = get_standards(category=evaluation_name)
+
+    if not standards:
+        st.info("No hay estándares en esta evaluación todavía.")
+        return
+
+    # Main content wrapped in fragment
+    show_evaluation_detail_content(user, evaluation_name, standards)
