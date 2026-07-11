@@ -171,3 +171,48 @@ def create_evaluation(name: str, icon: str = "", description: str = "", user_id:
     except Exception as e:
         st.error(f"Failed to create evaluation: {str(e)}")
         return False
+
+
+# ====================== NEW HELPERS FOR AUTO ORDER ======================
+def get_max_orden_for_evaluation(category: str) -> int:
+    """Return the maximum 'orden' value among all standards in the given evaluation/category.
+    Returns 0 if no standards exist yet (so first one gets order 1).
+    """
+    if not category:
+        return 0
+    try:
+        res = supabase.table("standards").select("orden").eq("category", category).execute()
+        values = []
+        for row in (res.data or []):
+            o = row.get("orden")
+            if o is not None:
+                try:
+                    values.append(int(o))
+                except (ValueError, TypeError):
+                    pass
+        return max(values) if values else 0
+    except Exception as e:
+        st.error(f"Failed to compute max orden for evaluation '{category}': {str(e)}")
+        return 0
+
+
+def get_max_orden_for_standard(standard_id: str) -> int:
+    """Return the maximum 'orden' value among all components belonging to the given standard_id.
+    Returns 0 if no components yet (so first component gets order 1).
+    """
+    if not standard_id:
+        return 0
+    try:
+        res = supabase.table("components").select("orden").eq("standard_id", standard_id).execute()
+        values = []
+        for row in (res.data or []):
+            o = row.get("orden")
+            if o is not None:
+                try:
+                    values.append(int(o))
+                except (ValueError, TypeError):
+                    pass
+        return max(values) if values else 0
+    except Exception as e:
+        st.error(f"Failed to compute max orden for standard_id '{standard_id}': {str(e)}")
+        return 0
