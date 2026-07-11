@@ -1,4 +1,5 @@
 import streamlit as st
+from datetime import datetime
 from db import (
     get_standards,
     get_components_for_standard,
@@ -7,11 +8,12 @@ from db import (
     get_signed_url,
     get_evaluations
 )
+from auth import supabase
 
 
 def show_evaluation_grid():
     st.title("📊 Evaluaciones")
-    st.caption("Selecciona un tipo de evaluación para ver sus estándares")
+    st.caption("Selecciona un tipo de evaluación para ver sus estándares y componentes")
 
     evaluations = get_evaluations()
     if not evaluations:
@@ -37,7 +39,7 @@ def show_evaluation_grid():
 def show_evaluation_detail(user: dict, evaluation_name: str):
     col1, col2 = st.columns([1, 5])
     with col1:
-        if st.button("← Volver", use_container_width=True):
+        if st.button("← Volver a Evaluaciones", use_container_width=True):
             st.session_state.pop("selected_evaluation", None)
             st.session_state.pop("selected_standard_id", None)
             st.rerun()
@@ -49,7 +51,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         st.info("No hay estándares en esta evaluación todavía.")
         return
 
-    # Sidebar with Standards
+    # === LEFT SIDEBAR: Standards ===
     sidebar_col, content_col = st.columns([1.3, 3.2], gap="large")
 
     with sidebar_col:
@@ -64,10 +66,9 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         selected_standard_id = st.session_state.get("selected_standard_id")
 
         if not selected_standard_id:
-            st.info("👈 Selecciona un estándar del panel izquierdo para ver sus componentes y evidencias.")
+            st.info("👈 Selecciona un estándar del panel izquierdo para ver sus componentes.")
             return
 
-        # Get selected standard
         current_standard = next((s for s in standards if s["id"] == selected_standard_id), None)
         if not current_standard:
             st.error("Estándar no encontrado.")
@@ -82,14 +83,14 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
             st.warning("Este estándar aún no tiene componentes.")
             return
 
-        # Show each component as a card
+        # === COMPONENTS + EVIDENCE ===
         for comp in components:
             with st.container(border=True):
                 st.markdown(f"### {comp.get('name')}")
-                
+
                 evidence_list = get_evidence_for_component(comp["id"])
-                
-                # Show current status based on latest evidence
+
+                # Current status
                 if evidence_list:
                     latest = evidence_list[-1]
                     grade = latest.get("grade")
@@ -99,13 +100,13 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                     else:
                         st.markdown("**Estado actual:** ⚪ En Revisión")
 
-                # History thread (oldest first)
+                # History (oldest first)
                 if evidence_list:
-                    with st.expander("📜 Historial / Evolución", expanded=True):
+                    with st.expander("📜 Historial", expanded=len(evidence_list) <= 3):
                         for ev in evidence_list:
-                            st.markdown(f"**{ev.get('created_at', '')[:10]}**")
-                            if ev.get("file_name"):
-                                url = get_signed_url(ev["file_path"]) if ev.get("file_path") else None
+                            st.markdown(f"**{ev.get('created_at', '')[:16]}**")
+                            if ev.get("file_name") and ev.get("file_path"):
+                                url = get_signed_url(ev["file_path"])
                                 if url:
                                     st.markdown(f"📎 [{ev['file_name']}]({url})")
                             if ev.get("grade"):
@@ -114,21 +115,56 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
                                 st.markdown(f"> {ev['review_comment']}")
                             st.divider()
 
-                # Add new evidence / review form (always visible)
+                # === ADD EVIDENCE / REVIEW FORM ===
                 st.markdown("#### ➕ Agregar evidencia o revisión")
+
                 with st.form(key=f"form_{comp['id']}", clear_on_submit=True):
-                    uploaded_file = st.file_uploader("Subir archivo (opcional)", type=["pdf", "docx", "png", "jpg", "jpeg"])
-                    grade = st.selectbox("Grado (opcional)", ["", "Cumple", "Cumple Parcialmente", "No Cumple"])
+                    action_type = st.radio(
+                        "Tipo de acción",
+                        options=["Evidencia", "Revisión"],
+                        horizontal=True,
+                        help="Evidencia = solo subir archivo. Revisión = subir archivo + calificar."
+                    )
+
+                    uploaded_file = st.file_uploader(
+                        "Subir archivo (opcional)", 
+                        type=["pdf", "docx", "png", "jpg", "jpeg"]
+                    )
+
+                    grade = None
+                    if action_type == "Revisión":
+                        grade = st.selectbox(
+                            "Grado", 
+                            ["", "Cumple", "Cumple Parcialmente", "No Cumple"]
+                        )
+
                     comment = st.text_area("Comentario / Observación")
 
                     submitted = st.form_submit_button("Guardar", type="primary")
 
                     if submitted:
-                        file_path = file_name = None
-                        if uploaded_file:
-                            # TODO: Upload file to Supabase Storage (same logic as before)
-                            pass  # We'll add proper upload logic next
+                        file_path = None
+                        file_name = None
 
+                        # Upload file to Supabase Storage
+                        if uploaded_file:
+                            try:
+                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                safe_name = "".join(
+                                    c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name
+                                )
+                                file_path = f"{user['id']}/evidence/{comp['id']}/{timestamp}_{safe_name}"
+
+                                supabase.storage.from_("documents").upload(
+                                    file_path,
+                                    uploaded_file.getvalue(),
+                                    {"content-type": uploaded_file.type}
+                                )
+                                file_name = uploaded_file.name
+                            except Exception as e:
+                                st.error(f"Error al subir el archivo: {e}")
+
+                        # Save to database
                         if create_evidence(
                             component_id=comp["id"],
                             user_id=user["id"],
