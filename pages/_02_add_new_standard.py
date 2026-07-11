@@ -156,10 +156,11 @@ def show_add_new_standard_page(user: dict):
             suggested_comp_orden = 1
         else:
             standard_options = {}
+
             for s in standards_in_eval:
-                label = f"{s.get('orden', '?')}. {s.get('standard', 'Unnamed')}"
-                if s.get("id"):
-                    label += f"  ({str(s['id'])[:8]}...)"
+                orden = s.get("orden", "?")
+                std_name = s.get("standard", "Unnamed")
+                label = f"{orden}. {std_name}"    
                 standard_options[label] = s["id"]
 
             selected_label = st.selectbox(
