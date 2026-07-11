@@ -5,6 +5,7 @@ from auth import supabase
 
 
 # ====================== STANDARDS ======================
+@st.cache_data(ttl=300)
 def get_standards(category: Optional[str] = None) -> List[Dict]:
     try:
         query = supabase.table("standards").select("*")
@@ -42,6 +43,7 @@ def create_standard(user_id, user_email, standard_name, status="Pending", catego
             "orden": orden
         }
         supabase.table("standards").insert(data).execute()
+        st.cache_data.clear()   # Invalidate cache so next read sees the new standard
         return True
     except Exception as e:
         st.error(f"Error creating standard: {str(e)}")
@@ -49,6 +51,7 @@ def create_standard(user_id, user_email, standard_name, status="Pending", catego
 
 
 # ====================== COMPONENTS ======================
+@st.cache_data(ttl=300)
 def get_components_for_standard(standard_id: str) -> List[Dict]:
     try:
         res = (supabase.table("components")
@@ -72,6 +75,7 @@ def create_component(standard_id: str, name: str, orden: int = 100, description:
             "created_by": user_id
         }
         supabase.table("components").insert(data).execute()
+        st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Error creating component: {str(e)}")
@@ -79,6 +83,7 @@ def create_component(standard_id: str, name: str, orden: int = 100, description:
 
 
 # ====================== EVIDENCE ======================
+@st.cache_data(ttl=300)
 def get_evidence_for_component(component_id: str) -> List[Dict]:
     try:
         res = (supabase.table("evidence")
@@ -113,7 +118,7 @@ def create_evidence(
         }
         supabase.table("evidence").insert(data).execute()
 
-        # Update component's current_grade
+        # Update component's current_grade (still needed)
         latest = (supabase.table("evidence")
                   .select("grade")
                   .eq("component_id", component_id)
@@ -129,12 +134,14 @@ def create_evidence(
             "current_grade": latest_grade
         }).eq("id", component_id).execute()
 
+        st.cache_data.clear()   # Invalidate so overview + detail see the new evidence immediately
         return True
     except Exception as e:
         st.error(f"Error creating evidence: {str(e)}")
         return False
 
 
+@st.cache_data(ttl=60)   # Short TTL because signed URLs expire
 def get_signed_url(file_path: str, expires_in: int = 300) -> Optional[str]:
     try:
         signed_resp = supabase.storage.from_("documents").create_signed_url(file_path, expires_in)
@@ -145,6 +152,7 @@ def get_signed_url(file_path: str, expires_in: int = 300) -> Optional[str]:
 
 
 # ====================== EVALUATIONS ======================
+@st.cache_data(ttl=300)
 def get_evaluations() -> list:
     try:
         res = supabase.table("evaluations").select("*").order("name").execute()
@@ -163,6 +171,7 @@ def create_evaluation(name: str, icon: str = "", description: str = "", user_id:
             "created_by": user_id
         }
         supabase.table("evaluations").insert(data).execute()
+        st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Failed to create evaluation: {str(e)}")
@@ -170,6 +179,7 @@ def create_evaluation(name: str, icon: str = "", description: str = "", user_id:
 
 
 # ====================== AUTO ORDER HELPERS ======================
+@st.cache_data(ttl=300)
 def get_max_orden_for_evaluation(category: str) -> int:
     if not category:
         return 0
@@ -181,6 +191,7 @@ def get_max_orden_for_evaluation(category: str) -> int:
         return 0
 
 
+@st.cache_data(ttl=300)
 def get_max_orden_for_standard(standard_id: str) -> int:
     if not standard_id:
         return 0

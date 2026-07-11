@@ -73,6 +73,107 @@ def show_overview_table(standards, evaluation_name):
     st.dataframe(table_data, width="stretch", hide_index=True)
 
 
+@st.fragment
+def show_standards_expanders(standards, user):
+    """Top-level fragment (fixed from nested definition). Most interactions here only rerun this block."""
+    for std in standards:
+        with st.expander(f"📋 {std.get('standard', 'Sin nombre')}", expanded=False):
+            if std.get("description"):
+                st.caption(std["description"])
+
+            components = get_components_for_standard(std["id"])
+            if not components:
+                st.warning("Este estándar aún no tiene componentes.")
+                continue
+
+            for comp in components:
+                with st.container(border=True):
+                    st.markdown(f"### {comp.get('name')}")
+
+                    evidence_list = get_evidence_for_component(comp["id"])
+
+                    # Current status
+                    if evidence_list:
+                        latest = evidence_list[-1]
+                        grade = latest.get("grade")
+                        if grade:
+                            color = {"Cumple": "🟢", "Cumple Parcialmente": "🟡", "No Cumple": "🔴"}.get(grade, "⚪")
+                            st.markdown(f"**Estado actual:** {color} {grade}")
+                        else:
+                            st.markdown("**Estado actual:** ⚪ En Revisión")
+                    else:
+                        st.markdown("**Estado actual:** ⚪ Sin evidencia")
+
+                    # History
+                    if evidence_list:
+                        with st.expander("📜 Historial", expanded=len(evidence_list) <= 3):
+                            for ev in evidence_list:
+                                formatted_time = format_lima_time(ev.get("created_at", ""))
+                                st.markdown(f"**{formatted_time}**")
+                                if ev.get("file_name") and ev.get("file_path"):
+                                    url = get_signed_url(ev["file_path"])
+                                    if url:
+                                        st.markdown(f"📎 [{ev['file_name']}]({url})")
+                                if ev.get("grade"):
+                                    st.markdown(f"**Grado:** {ev['grade']}")
+                                if ev.get("review_comment"):
+                                    st.markdown(f"> {ev['review_comment']}")
+                                st.divider()
+
+                    # Add Evidence / Review form
+                    with st.expander("➕ Agregar evidencia o revisión", expanded=False):
+                        action_type = st.radio(
+                            "Tipo de acción",
+                            options=["Evidencia", "Revisión"],
+                            horizontal=True,
+                            key=f"action_type_{comp['id']}"
+                        )
+                        with st.form(key=f"form_{comp['id']}", clear_on_submit=True):
+                            uploaded_file = st.file_uploader(
+                                "Subir archivo (opcional)",
+                                type=["pdf", "docx", "png", "jpg", "jpeg"]
+                            )
+                            grade = None
+                            if action_type == "Revisión":
+                                grade = st.selectbox(
+                                    "Grado",
+                                    ["", "Cumple", "Cumple Parcialmente", "No Cumple"],
+                                    key=f"grade_{comp['id']}"
+                                )
+                            comment = st.text_area("Comentario / Observación")
+                            submitted = st.form_submit_button("Guardar", type="primary")
+
+                            if submitted:
+                                file_path = None
+                                file_name = None
+                                if uploaded_file:
+                                    try:
+                                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                        safe_name = "".join(
+                                            c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name
+                                        )
+                                        file_path = f"{user['id']}/evidence/{comp['id']}/{timestamp}_{safe_name}"
+                                        supabase.storage.from_("documents").upload(
+                                            file_path,
+                                            uploaded_file.getvalue(),
+                                            {"content-type": uploaded_file.type}
+                                        )
+                                        file_name = uploaded_file.name
+                                    except Exception as e:
+                                        st.error(f"Error al subir el archivo: {e}")
+
+                                if create_evidence(
+                                    component_id=comp["id"],
+                                    user_id=user["id"],
+                                    file_path=file_path,
+                                    file_name=file_name,
+                                    grade=grade if grade else None,
+                                    review_comment=comment if comment else None
+                                ):
+                                    st.success("✅ Guardado correctamente")
+                                    st.rerun(scope="fragment")   # Only refresh this fragment (keeps rest stable)
+
+
 def show_evaluation_detail(user: dict, evaluation_name: str):
     # Back button + Title + Refresh button
     col1, col2, col3 = st.columns([2, 5, 2])
@@ -84,6 +185,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         st.title(f"📁 {evaluation_name}")
     with col3:
         if st.button("🔄 Actualizar datos", width="stretch"):
+            st.cache_data.clear()   # Hard refresh - forces fresh data from DB
             st.rerun()
 
     standards = get_standards(category=evaluation_name)
@@ -92,111 +194,12 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         st.info("No hay estándares en esta evaluación todavía.")
         return
 
-    # General Summary
+    # General Summary (uses cached functions)
     show_overview_table(standards, evaluation_name)
     st.divider()
 
-    # Standards as Expanders (inside fragment)
-    @st.fragment
-    def show_standards_expanders():
-        for std in standards:
-            with st.expander(f"📋 {std.get('standard', 'Sin nombre')}", expanded=False):
-                if std.get("description"):
-                    st.caption(std["description"])
-
-                components = get_components_for_standard(std["id"])
-                if not components:
-                    st.warning("Este estándar aún no tiene componentes.")
-                    continue
-
-                for comp in components:
-                    with st.container(border=True):
-                        st.markdown(f"### {comp.get('name')}")
-
-                        evidence_list = get_evidence_for_component(comp["id"])
-
-                        # Current status
-                        if evidence_list:
-                            latest = evidence_list[-1]
-                            grade = latest.get("grade")
-                            if grade:
-                                color = {"Cumple": "🟢", "Cumple Parcialmente": "🟡", "No Cumple": "🔴"}.get(grade, "⚪")
-                                st.markdown(f"**Estado actual:** {color} {grade}")
-                            else:
-                                st.markdown("**Estado actual:** ⚪ En Revisión")
-                        else:
-                            st.markdown("**Estado actual:** ⚪ Sin evidencia")
-
-                        # History
-                        if evidence_list:
-                            with st.expander("📜 Historial", expanded=len(evidence_list) <= 3):
-                                for ev in evidence_list:
-                                    formatted_time = format_lima_time(ev.get("created_at", ""))
-                                    st.markdown(f"**{formatted_time}**")
-                                    if ev.get("file_name") and ev.get("file_path"):
-                                        url = get_signed_url(ev["file_path"])
-                                        if url:
-                                            st.markdown(f"📎 [{ev['file_name']}]({url})")
-                                    if ev.get("grade"):
-                                        st.markdown(f"**Grado:** {ev['grade']}")
-                                    if ev.get("review_comment"):
-                                        st.markdown(f"> {ev['review_comment']}")
-                                    st.divider()
-
-                        # Add Evidence / Review form
-                        with st.expander("➕ Agregar evidencia o revisión", expanded=False):
-                            action_type = st.radio(
-                                "Tipo de acción",
-                                options=["Evidencia", "Revisión"],
-                                horizontal=True,
-                                key=f"action_type_{comp['id']}"
-                            )
-                            with st.form(key=f"form_{comp['id']}", clear_on_submit=True):
-                                uploaded_file = st.file_uploader(
-                                    "Subir archivo (opcional)",
-                                    type=["pdf", "docx", "png", "jpg", "jpeg"]
-                                )
-                                grade = None
-                                if action_type == "Revisión":
-                                    grade = st.selectbox(
-                                        "Grado",
-                                        ["", "Cumple", "Cumple Parcialmente", "No Cumple"],
-                                        key=f"grade_{comp['id']}"
-                                    )
-                                comment = st.text_area("Comentario / Observación")
-                                submitted = st.form_submit_button("Guardar", type="primary")
-
-                                if submitted:
-                                    file_path = None
-                                    file_name = None
-                                    if uploaded_file:
-                                        try:
-                                            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                            safe_name = "".join(
-                                                c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name
-                                            )
-                                            file_path = f"{user['id']}/evidence/{comp['id']}/{timestamp}_{safe_name}"
-                                            supabase.storage.from_("documents").upload(
-                                                file_path,
-                                                uploaded_file.getvalue(),
-                                                {"content-type": uploaded_file.type}
-                                            )
-                                            file_name = uploaded_file.name
-                                        except Exception as e:
-                                            st.error(f"Error al subir el archivo: {e}")
-
-                                    if create_evidence(
-                                        component_id=comp["id"],
-                                        user_id=user["id"],
-                                        file_path=file_path,
-                                        file_name=file_name,
-                                        grade=grade if grade else None,
-                                        review_comment=comment if comment else None
-                                    ):
-                                        st.success("✅ Guardado correctamente")
-                                        st.rerun()
-
-    show_standards_expanders()
+    # Standards as Expanders - now in stable top-level fragment
+    show_standards_expanders(standards, user)
 
 
 def show_evaluations_page(user: dict):
