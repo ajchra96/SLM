@@ -74,11 +74,15 @@ def show_overview_table(standards, evaluation_name):
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
-    # Header with refresh button
-    col1, col2 = st.columns([5, 2])
+    # Back button + Title + Refresh button
+    col1, col2, col3 = st.columns([2, 5, 2])
     with col1:
-        st.title(f"📁 {evaluation_name}")
+        if st.button("← Volver a Evaluaciones", width="stretch"):
+            st.session_state.pop("selected_evaluation", None)
+            st.rerun()
     with col2:
+        st.title(f"📁 {evaluation_name}")
+    with col3:
         if st.button("🔄 Actualizar datos", width="stretch"):
             st.rerun()
 
@@ -92,7 +96,7 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
     show_overview_table(standards, evaluation_name)
     st.divider()
 
-    # Standards as Expanders (wrapped in fragment)
+    # Standards as Expanders (inside fragment)
     @st.fragment
     def show_standards_expanders():
         for std in standards:
