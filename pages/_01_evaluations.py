@@ -92,16 +92,15 @@ def show_overview_table(standards, evaluation_name):
 
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
-    with st.spinner("Cargando evaluación..."):
-        col1, col2 = st.columns([1, 5])
-        with col1:
-            if st.button("← Volver a Evaluaciones", use_container_width=True):
-                st.session_state.pop("selected_evaluation", None)
-                st.query_params.clear()
-                st.rerun()
-        with col2:
-            icon = next((e["icon"] for e in get_evaluations() if e["name"] == evaluation_name), "📁")
-            st.title(f"{icon} {evaluation_name}")
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("← Volver a Evaluaciones", use_container_width=True):
+            st.session_state.pop("selected_evaluation", None)
+            st.query_params.clear()    
+            st.rerun()
+    with col2:
+        icon = next((e["icon"] for e in get_evaluations() if e["name"] == evaluation_name), "📁")
+        st.title(f"{icon} {evaluation_name}")
 
     standards = get_standards(category=evaluation_name)
     if not standards:

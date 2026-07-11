@@ -5,6 +5,7 @@ from auth import supabase
 
 
 # ====================== STANDARDS ======================
+@st.cache_data(ttl=60)
 def get_standards(category: Optional[str] = None) -> List[Dict]:
     try:
         query = supabase.table("standards").select("*")
