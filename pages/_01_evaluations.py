@@ -115,7 +115,7 @@ def show_standards_expanders(standards, user):
                                     if url:
                                         st.markdown(f"📎 [{ev['file_name']}]({url})")
                                 if ev.get("grade"):
-                                    st.markdown(f"**Grado:** {ev['grade']}")
+                                    st.markdown(f"**Evaluación:** {ev['grade']}")
                                 if ev.get("review_comment"):
                                     st.markdown(f"> {ev['review_comment']}")
                                 st.divider()
@@ -136,7 +136,7 @@ def show_standards_expanders(standards, user):
                             grade = None
                             if action_type == "Revisión":
                                 grade = st.selectbox(
-                                    "Grado",
+                                    "Evaluación",
                                     ["", "Sin Hallazgo", "Preocupación", "Debilidad", "Deficiencia"],
                                     key=f"grade_{comp['id']}"
                                 )
