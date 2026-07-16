@@ -61,8 +61,15 @@ def show_add_new_standard_page(user: dict):
     st.divider()
 
     # Cargar evaluaciones (now cached)
+
     evaluations = get_evaluations()
-    evaluation_names = [e["name"] for e in evaluations] if evaluations else []
+    if evaluations:
+        evaluation_map = {e["name"]: e.get("id") for e in evaluations}
+        evaluation_names = list(evaluation_map.keys())
+    else:
+        evaluation_map = {}
+        evaluation_names = []
+    evaluation_id = None  # default (will be set when user picks an evaluation)
 
     # ========== 2 + 3 wrapped in fragment so only this part reruns on selects ==========
     @st.fragment
@@ -82,6 +89,7 @@ def show_add_new_standard_page(user: dict):
                 key="create_std_eval_select",
                 help="El estándar pertenecerá a esta evaluación."
             )
+            evaluation_id = evaluation_map.get(std_category) if std_category else None
             if std_category:
                 max_existing = get_max_orden_for_evaluation(std_category)
                 suggested_orden = max_existing + 1
@@ -126,7 +134,8 @@ def show_add_new_standard_page(user: dict):
                         standard_name=std_name.strip(),
                         status="Pending",
                         category=std_category,
-                        orden=int(std_orden)
+                        orden=int(std_orden),
+                        evaluation_id=evaluation_id
                     )
                     if success:
                         st.success(f"✅ Estándar '{std_name}' creado correctamente con orden {std_orden}.")

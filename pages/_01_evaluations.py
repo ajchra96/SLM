@@ -176,13 +176,14 @@ def show_standards_expanders(standards, user):
 
 def show_evaluation_detail(user: dict, evaluation_name: str):
     # Back button + Title + Refresh button
-    col1, col2, col3 = st.columns([2, 5, 2])
+    col1, col2, col3 = st.columns([8, 2, 2])
+
     with col1:
+        st.title(f"📁 {evaluation_name}")
+    with col2:
         if st.button("← Volver a Evaluaciones", width="stretch"):
             st.session_state.pop("selected_evaluation", None)
             st.rerun()
-    with col2:
-        st.title(f"📁 {evaluation_name}")
     with col3:
         if st.button("🔄 Actualizar datos", width="stretch"):
             st.cache_data.clear()   # Hard refresh - forces fresh data from DB
@@ -193,6 +194,10 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
     if not standards:
         st.info("No hay estándares en esta evaluación todavía.")
         return
+
+    # General Summary (uses cached functions)
+    show_informe_autoestudio(standards, evaluation_name)
+    st.divider()
 
     # General Summary (uses cached functions)
     show_overview_table(standards, evaluation_name)
@@ -208,3 +213,7 @@ def show_evaluations_page(user: dict):
         show_evaluation_detail(user, selected)
     else:
         show_evaluation_grid()
+
+def show_informe_autoestudio(standards, evaluation_name):
+    st.markdown("### Informe de Autoestudio")
+    

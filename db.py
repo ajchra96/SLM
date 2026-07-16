@@ -40,7 +40,8 @@ def create_standard(user_id, user_email, standard_name, status="Pending", catego
             "uploaded_at": uploaded_at,
             "uploaded_by_email": user_email,
             "category": category,
-            "orden": orden
+            "orden": orden,
+            "evaluation_id": evaluation_id,
         }
         supabase.table("standards").insert(data).execute()
         st.cache_data.clear()   # Invalidate cache so next read sees the new standard
