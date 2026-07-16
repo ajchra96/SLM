@@ -97,7 +97,7 @@ def show_standards_expanders(standards, user):
                         latest = evidence_list[-1]
                         grade = latest.get("grade")
                         if grade:
-                            color = {"Cumple": "🟢", "Cumple Parcialmente": "🟡", "No Cumple": "🔴"}.get(grade, "⚪")
+                            color = {"Sin Hallazgo": "🟢", "Preocupación": "🟡", "Debilidad": "🟠", "Deficiencia": "🔴"}.get(grade, "⚪")
                             st.markdown(f"**Estado actual:** {color} {grade}")
                         else:
                             st.markdown("**Estado actual:** ⚪ En Revisión")
@@ -137,7 +137,7 @@ def show_standards_expanders(standards, user):
                             if action_type == "Revisión":
                                 grade = st.selectbox(
                                     "Grado",
-                                    ["", "Cumple", "Cumple Parcialmente", "No Cumple"],
+                                    ["", "Sin Hallazgo", "Preocupación", "Debilidad", "Deficiencia"],
                                     key=f"grade_{comp['id']}"
                                 )
                             comment = st.text_area("Comentario / Observación")
