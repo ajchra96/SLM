@@ -53,7 +53,9 @@ def show_evaluation_grid():
 
 
 def show_overview_table(standards, evaluation_name):
-    st.markdown("### 📊 Resumen de Estándares")
+    st.markdown("### Estándares")
+
+    st.markdown("#### Resumen")
     if not standards:
         st.info("No hay estándares en esta evaluación.")
         return
@@ -79,6 +81,7 @@ def show_overview_table(standards, evaluation_name):
 @st.fragment
 def show_standards_expanders(standards, user):
     """Top-level fragment (fixed from nested definition). Most interactions here only rerun this block."""
+    st.markdown("#### Detalle")
     for std in standards:
         with st.expander(f"📋 {std.get('standard', 'Sin nombre')}", expanded=False):
             if std.get("description"):
@@ -218,7 +221,7 @@ def show_evaluations_page(user: dict):
         show_evaluation_grid()
 
 def show_informe_autoestudio(standards, evaluation_name):
-    st.markdown("### 2. Informe de Autoestudio")
+    st.markdown("### Informe de Autoestudio")
 
     # Get evaluation_id from the first standard (they all belong to the same evaluation)
     if not standards:
