@@ -6,7 +6,9 @@ from db import (
     get_standards,
     create_component,
     get_max_orden_for_evaluation,
-    get_max_orden_for_standard
+    get_max_orden_for_standard,
+    get_extra_requirements,           # NEW
+    create_extra_requirement          # NEW
 )
 
 
@@ -60,8 +62,7 @@ def show_add_new_standard_page(user: dict):
     show_create_evaluation_form(user)
     st.divider()
 
-    # Cargar evaluaciones (now cached)
-
+    # Cargar evaluaciones
     evaluations = get_evaluations()
     if evaluations:
         evaluation_map = {e["name"]: e.get("id") for e in evaluations}
@@ -69,9 +70,9 @@ def show_add_new_standard_page(user: dict):
     else:
         evaluation_map = {}
         evaluation_names = []
-    evaluation_id = None  # default (will be set when user picks an evaluation)
+    evaluation_id = None
 
-    # ========== 2 + 3 wrapped in fragment so only this part reruns on selects ==========
+    # ========== 2 + 3 wrapped in fragment ==========
     @st.fragment
     def show_standard_and_component_section():
         # ========== 2. CREAR ESTÁNDAR ==========
@@ -229,3 +230,54 @@ def show_add_new_standard_page(user: dict):
 
     st.divider()
     st.caption("💡 Ve a la sección de Evaluaciones para ver la estructura jerárquica ordenada por 'orden' y agregar evidencia a los componentes.")
+
+    st.divider()
+
+    # ========== 4. DOCUMENTOS EXTRA (NUEVO - Sección 4) ==========
+    st.subheader("4️⃣ Documentos Extra (EXTRA DOCUMENT)")
+    st.caption("Documentos adicionales requeridos (ej: Informe de Autoestudio, Apéndices, Tablas). Se crean aquí y los usuarios los suben en la vista de evaluación.")
+
+    if not evaluation_names:
+        st.info("Primero crea una evaluación en la sección 1.")
+    else:
+        extra_eval_name = st.selectbox(
+            "Seleccionar Evaluación",
+            options=evaluation_names,
+            key="extra_eval_select_v2"
+        )
+        extra_eval_id = evaluation_map.get(extra_eval_name)
+
+        if extra_eval_id:
+            extras = get_extra_requirements(extra_eval_id)
+
+            if extras:
+                st.markdown("**Documentos Extra actuales en esta evaluación:**")
+                for ex in extras:
+                    status = "✅ Tiene archivo" if ex.get("file_path") else "⬜ Pendiente"
+                    st.markdown(f"- **{ex.get('label', 'Sin nombre')}** — {status}")
+
+            with st.form("add_extra_document_form", clear_on_submit=True):
+                label = st.text_input("Nombre del documento (ej: a) Informe de Autoestudio (PDF))")
+                file_type = st.text_input("Tipo de archivo esperado", value="pdf")
+                description = st.text_area("Descripción (opcional)")
+                orden = st.number_input("Orden", min_value=1, value=len(extras) + 1 if extras else 1)
+                uploaded_file = st.file_uploader(
+                    "Subir archivo ahora (opcional - para mostrar ejemplo)",
+                    type=["pdf", "xlsx", "docx"]
+                )
+
+                if st.form_submit_button("Agregar Documento Extra", type="primary", width='stretch'):
+                    if label.strip():
+                        success = create_extra_requirement(
+                            evaluation_id=extra_eval_id,
+                            label=label.strip(),
+                            file_type=file_type,
+                            description=description.strip() if description else "",
+                            orden=int(orden),
+                            user_id=user["id"],
+                            user_email=user.get("email"),
+                            uploaded_file=uploaded_file
+                        )
+                        if success:
+                            st.success("✅ Documento Extra agregado correctamente.")
+                            st.rerun()

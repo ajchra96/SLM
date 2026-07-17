@@ -19,8 +19,8 @@ def get_standards(category: Optional[str] = None) -> List[Dict]:
         return []
 
 
-def create_standard(user_id, user_email, standard_name, status="Pending", category=None,
-                    orden=100, uploaded_file=None) -> bool:
+def create_standard(user_id, user_email, standard_name, status="Pending", category=None, 
+                    orden=100, uploaded_file=None, evaluation_id: Optional[str] = None) -> bool:
     try:
         file_path = file_name = uploaded_at = None
         if uploaded_file:
@@ -202,3 +202,137 @@ def get_max_orden_for_standard(standard_id: str) -> int:
         return max(values) if values else 0
     except Exception:
         return 0
+    
+# ====================== EXTRA REQUIREMENTS (Documentos Extra) ======================
+
+@st.cache_data(ttl=300)
+def get_extra_requirements(evaluation_id: str, type_filter: str = "EXTRA DOCUMENT") -> List[Dict]:
+    try:
+        query = supabase.table("evaluation_extra_requirements").select("*").eq("evaluation_id", evaluation_id)
+        if type_filter:
+            query = query.eq("type", type_filter)
+        res = query.order("orden").execute()
+        return res.data or []
+    except Exception as e:
+        st.error(f"Failed to load extra requirements: {str(e)}")
+        return []
+
+
+def create_extra_requirement(
+    evaluation_id: str,
+    label: str,
+    file_type: Optional[str] = None,
+    description: str = "",
+    orden: int = 1,
+    is_mandatory: bool = True,
+    grupo: Optional[str] = None,
+    user_id: Optional[str] = None,
+    user_email: Optional[str] = None,
+    uploaded_file=None
+) -> bool:
+    try:
+        file_path = file_name = uploaded_at = None
+        if uploaded_file:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name)
+            file_path = f"{user_id}/extra_requirements/{evaluation_id}/{timestamp}_{safe_name}"
+            supabase.storage.from_("documents").upload(
+                file_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type}
+            )
+            file_name = uploaded_file.name
+            uploaded_at = datetime.now().isoformat()
+
+        data = {
+            "evaluation_id": evaluation_id,
+            "type": "EXTRA DOCUMENT",
+            "label": label.strip(),
+            "file_type": file_type,
+            "description": description.strip() if description else None,
+            "orden": orden,
+            "is_mandatory": is_mandatory,
+            "grupo": grupo,
+            "file_path": file_path,
+            "file_name": file_name,
+            "uploaded_at": uploaded_at,
+            "uploaded_by_email": user_email,
+            "created_by": user_id,
+        }
+        supabase.table("evaluation_extra_requirements").insert(data).execute()
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error creating extra requirement: {str(e)}")
+        return False
+
+
+def upload_file_to_extra_requirement(
+    requirement_id: str,
+    user_id: str,
+    user_email: str,
+    uploaded_file
+) -> bool:
+    try:
+        # Delete old file if exists
+        current = supabase.table("evaluation_extra_requirements").select("file_path").eq("id", requirement_id).single().execute()
+        if current.data and current.data.get("file_path"):
+            try:
+                supabase.storage.from_("documents").remove([current.data["file_path"]])
+            except:
+                pass
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name)
+        file_path = f"{user_id}/extra_requirements/{requirement_id}/{timestamp}_{safe_name}"
+
+        supabase.storage.from_("documents").upload(
+            file_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type}
+        )
+
+        supabase.table("evaluation_extra_requirements").update({
+            "file_path": file_path,
+            "file_name": uploaded_file.name,
+            "uploaded_at": datetime.now().isoformat(),
+            "uploaded_by_email": user_email
+        }).eq("id", requirement_id).execute()
+
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error uploading file to extra requirement: {str(e)}")
+        return False
+
+
+def remove_file_from_extra_requirement(requirement_id: str) -> bool:
+    try:
+        current = supabase.table("evaluation_extra_requirements").select("file_path").eq("id", requirement_id).single().execute()
+        if current.data and current.data.get("file_path"):
+            try:
+                supabase.storage.from_("documents").remove([current.data["file_path"]])
+            except:
+                pass
+
+        supabase.table("evaluation_extra_requirements").update({
+            "file_path": None,
+            "file_name": None,
+            "uploaded_at": None,
+            "uploaded_by_email": None
+        }).eq("id", requirement_id).execute()
+
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error removing file: {str(e)}")
+        return False
+
+
+@st.cache_data(ttl=300)
+def get_extra_requirements_progress(evaluation_id: str, type_filter: str = "EXTRA DOCUMENT") -> Dict:
+    extras = get_extra_requirements(evaluation_id, type_filter)
+    total = len(extras)
+    completed = sum(1 for e in extras if e.get("file_path"))
+    return {
+        "total": total,
+        "completed": completed,
+        "percentage": int((completed / total) * 100) if total > 0 else 0,
+        "items": extras
+    }

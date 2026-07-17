@@ -6,7 +6,10 @@ from db import (
     get_evidence_for_component,
     create_evidence,
     get_signed_url,
-    get_evaluations
+    get_evaluations,
+    get_extra_requirements_progress,           # NEW
+    upload_file_to_extra_requirement,          # NEW
+    remove_file_from_extra_requirement         # NEW
 )
 from auth import supabase
 
@@ -215,5 +218,92 @@ def show_evaluations_page(user: dict):
         show_evaluation_grid()
 
 def show_informe_autoestudio(standards, evaluation_name):
-    st.markdown("### Informe de Autoestudio")
+    st.markdown("### 2. Informe de Autoestudio")
+
+    # Get evaluation_id from the first standard (they all belong to the same evaluation)
+    if not standards:
+        st.info("No hay estándares en esta evaluación.")
+        return
+
+    evaluation_id = standards[0].get("evaluation_id")
+    if not evaluation_id:
+        st.warning("Esta evaluación aún no tiene 'evaluation_id' asignado.")
+        return
+
+    progress = get_extra_requirements_progress(evaluation_id)
+    extras = progress["items"]
+
+    if not extras:
+        st.info("Aún no se han configurado documentos extra para esta evaluación.")
+        return
+
+    # Progress
+    st.progress(progress["percentage"] / 100)
+    st.caption(f"**{progress['completed']} de {progress['total']} documentos completados** ({progress['percentage']}%)")
+
+    st.divider()
+
+    # Table of extra documents
+    for extra in extras:
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([5, 3, 4])
+
+            with col1:
+                st.markdown(f"**{extra.get('label', 'Sin nombre')}**")
+                if extra.get("description"):
+                    st.caption(extra["description"])
+
+            with col2:
+                if extra.get("file_path"):
+                    st.success("✅ Subido")
+                    if extra.get("file_name"):
+                        st.caption(extra["file_name"])
+                else:
+                    st.warning("⬜ Pendiente")
+
+            with col3:
+                if extra.get("file_path"):
+                    # View / Download
+                    url = get_signed_url(extra["file_path"])
+                    if url:
+                        st.markdown(f"[📥 Descargar]({url})")
+
+                    # Replace
+                    replace_file = st.file_uploader(
+                        "Reemplazar archivo",
+                        type=["pdf", "xlsx", "docx"],
+                        key=f"replace_{extra['id']}"
+                    )
+                    if replace_file:
+                        if upload_file_to_extra_requirement(
+                            requirement_id=extra["id"],
+                            user_id=st.session_state.user["id"],
+                            user_email=st.session_state.user.get("email"),
+                            uploaded_file=replace_file
+                        ):
+                            st.success("Archivo reemplazado")
+                            st.rerun()
+
+                    # Remove
+                    if st.button("Eliminar archivo", key=f"remove_{extra['id']}"):
+                        if remove_file_from_extra_requirement(extra["id"]):
+                            st.success("Archivo eliminado")
+                            st.rerun()
+
+                else:
+                    # Upload new file
+                    new_file = st.file_uploader(
+                        "Subir archivo",
+                        type=["pdf", "xlsx", "docx"],
+                        key=f"upload_{extra['id']}"
+                    )
+                    if new_file:
+                        if upload_file_to_extra_requirement(
+                            requirement_id=extra["id"],
+                            user_id=st.session_state.user["id"],
+                            user_email=st.session_state.user.get("email"),
+                            uploaded_file=new_file
+                        ):
+                            st.success("Archivo subido correctamente")
+                            st.rerun()
     
