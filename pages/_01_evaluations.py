@@ -201,22 +201,6 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
         st.info("No hay estándares en esta evaluación todavía.")
         return
 
-    # General Summary (uses cached functions)
-    show_informe_autoestudio(standards, evaluation_name)
-    st.divider()
-
-    # General Summary (uses cached functions)
-    show_overview_table(standards, evaluation_name)
-
-    # Standards as Expanders - now in stable top-level fragment
-    show_standards_expanders(standards, user)
-
-    standards = get_standards(category=evaluation_name)
-
-    if not standards:
-        st.info("No hay estándares en esta evaluación todavía.")
-        return
-
     # === TABS ===
     tab1, tab2 = st.tabs(["📄 Informe de Autoestudio", "📋 Estándares y Evidencia"])
 
