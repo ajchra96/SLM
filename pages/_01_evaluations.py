@@ -26,7 +26,7 @@ def format_lima_time(iso_string: str) -> str:
 
 
 def show_evaluation_grid():
-    st.title("📊 Evaluaciones")
+    st.title("Evaluaciones")
     st.caption("Selecciona un tipo de evaluación para ver sus estándares")
 
     evaluations = get_evaluations()
