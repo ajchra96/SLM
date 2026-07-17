@@ -207,7 +207,6 @@ def show_evaluation_detail(user: dict, evaluation_name: str):
 
     # General Summary (uses cached functions)
     show_overview_table(standards, evaluation_name)
-    st.divider()
 
     # Standards as Expanders - now in stable top-level fragment
     show_standards_expanders(standards, user)
