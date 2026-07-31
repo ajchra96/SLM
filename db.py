@@ -193,6 +193,7 @@ def create_template_extra_requirement(
 # PROJECTS
 # =====================================================
 
+
 @st.cache_data(ttl=120)
 def get_projects_for_user(user_id: str, is_super_admin: bool = False) -> List[Dict]:
     """Returns projects the user can see."""
