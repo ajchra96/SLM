@@ -277,6 +277,15 @@ def create_project(
         project = project_res.data[0]
         project_id = project["id"]
 
+        # 1b. Add the creator as project_admin (CRITICAL for RLS)
+        if user_id:
+            supabase.table("project_members").insert({
+                "project_id": project_id,
+                "user_id": user_id,
+                "role": "project_admin",
+                "assigned_by": user_id,
+            }).execute()
+
         # 2. Snapshot standards
         standards = get_standards_for_evaluation(evaluation_id)
         standard_id_map = {}  # original_id → new project_standard_id
@@ -324,10 +333,7 @@ def create_project(
 
     except Exception as e:
         st.error(f"Error creating project (snapshot failed): {e}")
-        # In a real production system we would roll back the project here.
-        # For now we surface the error clearly.
         return None
-
 
 def close_project(project_id: str, user_id: str) -> bool:
     _set_client_session_from_state()
