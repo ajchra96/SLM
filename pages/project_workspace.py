@@ -1,7 +1,7 @@
 # pages/project_workspace.py
 import streamlit as st
 from datetime import datetime, timedelta
-from auth import supabase
+from auth import supabase, _set_client_session_from_state
 from permissions import (
     can_upload,
     can_give_grade,
@@ -33,7 +33,6 @@ from db import (
     remove_project_member,
     find_user_by_email,
 )
-
 
 def format_lima_time(iso_string: str) -> str:
     if not iso_string:
@@ -282,6 +281,7 @@ def show_standards_and_evidence(user: dict, project: dict):
                                             import os
                                             ext = os.path.splitext(uploaded_file.name)[1].lower() or ".bin"
                                             file_path = f"projects/{project_id}/evidence/{comp['id']}{ext}"
+                                            _set_client_session_from_state()
                                             supabase.storage.from_("documents").upload(
                                                 file_path,
                                                 uploaded_file.getvalue(),

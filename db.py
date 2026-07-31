@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 import streamlit as st
-from auth import init_supabase
+from auth import init_supabase, _set_client_session_from_state
 import os
 
 supabase = init_supabase()
@@ -17,6 +17,7 @@ def _clear_cache():
 
 @st.cache_data(ttl=60)
 def get_signed_url(file_path: str, expires_in: int = 3600) -> Optional[str]:
+    _set_client_session_from_state()
     if not file_path:
         return None
     try:
@@ -32,6 +33,7 @@ def get_signed_url(file_path: str, expires_in: int = 3600) -> Optional[str]:
 # =====================================================
 
 def get_profile(user_id: str) -> Optional[Dict]:
+    _set_client_session_from_state()
     try:
         res = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
         return res.data
@@ -45,6 +47,7 @@ def get_profile(user_id: str) -> Optional[Dict]:
 
 @st.cache_data(ttl=300)
 def get_evaluations() -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = supabase.table("evaluations").select("*").order("name").execute()
         return res.data or []
@@ -54,6 +57,7 @@ def get_evaluations() -> List[Dict]:
 
 
 def create_evaluation(name: str, icon: str = "", description: str = "", user_id: str = None) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "name": name.strip(),
@@ -71,6 +75,7 @@ def create_evaluation(name: str, icon: str = "", description: str = "", user_id:
 
 @st.cache_data(ttl=300)
 def get_standards_for_evaluation(evaluation_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("standards")
@@ -92,6 +97,7 @@ def create_template_standard(
     orden: int = 100,
     user_id: str = None,
 ) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "evaluation_id": evaluation_id,
@@ -110,6 +116,7 @@ def create_template_standard(
 
 @st.cache_data(ttl=300)
 def get_components_for_template_standard(standard_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("components")
@@ -131,6 +138,7 @@ def create_template_component(
     orden: int = 100,
     user_id: str = None,
 ) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "standard_id": standard_id,
@@ -149,6 +157,7 @@ def create_template_component(
 
 @st.cache_data(ttl=300)
 def get_template_extra_requirements(evaluation_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("evaluation_extra_requirements")
@@ -172,6 +181,7 @@ def create_template_extra_requirement(
     is_mandatory: bool = True,
     user_id: str = None,
 ) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "evaluation_id": evaluation_id,
@@ -198,6 +208,7 @@ def create_template_extra_requirement(
 @st.cache_data(ttl=120)
 def get_projects_for_user(user_id: str, is_super_admin: bool = False) -> List[Dict]:
     """Returns projects the user can see."""
+    _set_client_session_from_state()
     try:
         if is_super_admin:
             res = supabase.table("projects").select("*, evaluations(name, icon)").order("created_at", desc=True).execute()
@@ -228,6 +239,7 @@ def get_projects_for_user(user_id: str, is_super_admin: bool = False) -> List[Di
 
 
 def get_project(project_id: str) -> Optional[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("projects")
@@ -251,6 +263,7 @@ def create_project(
     Creates a project and performs the full snapshot of the evaluation template.
     Returns the new project_id on success, None on failure.
     """
+    _set_client_session_from_state()
     try:
         # 1. Create the project
         project_data = {
@@ -317,6 +330,7 @@ def create_project(
 
 
 def close_project(project_id: str, user_id: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("projects").update({
             "status": "closed",
@@ -331,6 +345,7 @@ def close_project(project_id: str, user_id: str) -> bool:
 
 
 def reopen_project(project_id: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("projects").update({
             "status": "active",
@@ -349,6 +364,7 @@ def reopen_project(project_id: str) -> bool:
 # =====================================================
 
 def get_project_members(project_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("project_members")
@@ -363,6 +379,7 @@ def get_project_members(project_id: str) -> List[Dict]:
 
 
 def add_project_member(project_id: str, user_id: str, role: str, assigned_by: str) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "project_id": project_id,
@@ -379,6 +396,7 @@ def add_project_member(project_id: str, user_id: str, role: str, assigned_by: st
 
 
 def update_member_role(member_id: str, new_role: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("project_members").update({"role": new_role}).eq("id", member_id).execute()
         _clear_cache()
@@ -389,6 +407,7 @@ def update_member_role(member_id: str, new_role: str) -> bool:
 
 
 def remove_project_member(member_id: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("project_members").delete().eq("id", member_id).execute()
         _clear_cache()
@@ -399,6 +418,7 @@ def remove_project_member(member_id: str) -> bool:
 
 
 def find_user_by_email(email: str) -> Optional[Dict]:
+    _set_client_session_from_state()
     try:
         res = supabase.table("profiles").select("id, email, full_name").eq("email", email.strip().lower()).execute()
         if res.data:
@@ -414,6 +434,7 @@ def find_user_by_email(email: str) -> Optional[Dict]:
 
 @st.cache_data(ttl=120)
 def get_project_standards(project_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("project_standards")
@@ -430,6 +451,7 @@ def get_project_standards(project_id: str) -> List[Dict]:
 
 @st.cache_data(ttl=120)
 def get_project_components(project_standard_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("project_components")
@@ -445,6 +467,7 @@ def get_project_components(project_standard_id: str) -> List[Dict]:
 
 
 def create_project_standard(project_id: str, name: str, description: str = "", orden: int = 100) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "project_id": project_id,
@@ -461,6 +484,7 @@ def create_project_standard(project_id: str, name: str, description: str = "", o
 
 
 def create_project_component(project_standard_id: str, name: str, description: str = "", orden: int = 100) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "project_standard_id": project_standard_id,
@@ -477,6 +501,7 @@ def create_project_component(project_standard_id: str, name: str, description: s
 
 
 def delete_project_standard(standard_id: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("project_standards").delete().eq("id", standard_id).execute()
         _clear_cache()
@@ -487,6 +512,7 @@ def delete_project_standard(standard_id: str) -> bool:
 
 
 def delete_project_component(component_id: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("project_components").delete().eq("id", component_id).execute()
         _clear_cache()
@@ -497,6 +523,7 @@ def delete_project_component(component_id: str) -> bool:
 
 
 def get_max_orden_project_standards(project_id: str) -> int:
+    _set_client_session_from_state()
     try:
         res = supabase.table("project_standards").select("orden").eq("project_id", project_id).execute()
         values = [int(r["orden"]) for r in (res.data or []) if r.get("orden") is not None]
@@ -506,6 +533,7 @@ def get_max_orden_project_standards(project_id: str) -> int:
 
 
 def get_max_orden_project_components(project_standard_id: str) -> int:
+    _set_client_session_from_state()
     try:
         res = supabase.table("project_components").select("orden").eq("project_standard_id", project_standard_id).execute()
         values = [int(r["orden"]) for r in (res.data or []) if r.get("orden") is not None]
@@ -520,6 +548,7 @@ def get_max_orden_project_components(project_standard_id: str) -> int:
 
 @st.cache_data(ttl=60)
 def get_project_extra_requirements(project_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("project_extra_requirements")
@@ -542,6 +571,7 @@ def upload_file_to_project_extra(
     user_email: str,
     uploaded_file,
 ) -> bool:
+    _set_client_session_from_state()
     try:
         # Remove old file if exists
         current = (
@@ -584,6 +614,7 @@ def upload_file_to_project_extra(
 
 
 def soft_delete_project_extra_file(requirement_id: str, user_id: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("project_extra_requirements").update({
             "deleted_at": datetime.now().isoformat(),
@@ -615,6 +646,7 @@ def get_project_extra_progress(project_id: str) -> Dict:
 
 @st.cache_data(ttl=60)
 def get_evidence_for_component(project_component_id: str) -> List[Dict]:
+    _set_client_session_from_state()
     try:
         res = (
             supabase.table("evidence")
@@ -638,6 +670,7 @@ def create_evidence(
     grade: Optional[str] = None,
     review_comment: Optional[str] = None,
 ) -> bool:
+    _set_client_session_from_state()
     try:
         data = {
             "project_component_id": project_component_id,
@@ -665,6 +698,7 @@ def create_evidence(
 
 
 def soft_delete_evidence(evidence_id: str, user_id: str) -> bool:
+    _set_client_session_from_state()
     try:
         supabase.table("evidence").update({
             "deleted_at": datetime.now().isoformat(),
