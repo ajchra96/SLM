@@ -14,15 +14,34 @@ def is_super_admin(user: dict) -> bool:
 
 def get_project_role(user: dict, project_id: str) -> Optional[str]:
     """
-    Returns the user's role inside a specific project
-    or None if the user is not a member.
-    Super admin is treated as having full power even without membership.
+    Returns the user's role inside a specific project.
+    Super admin always gets full power.
     """
     if is_super_admin(user):
-        return "project_admin"  # full power
+        return "project_admin"
 
+    # First try the cached memberships
     members = user.get("project_memberships", {})
-    return members.get(project_id)
+    role = members.get(project_id)
+    if role:
+        return role
+
+    # Fallback: ask the database (in case session is stale)
+    try:
+        from auth import supabase
+        res = (
+            supabase.table("project_members")
+            .select("role")
+            .eq("project_id", project_id)
+            .eq("user_id", user["id"])
+            .execute()
+        )
+        if res.data:
+            return res.data[0]["role"]
+    except Exception:
+        pass
+
+    return None
 
 
 def can_manage_templates(user: dict) -> bool:
