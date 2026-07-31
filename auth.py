@@ -35,19 +35,31 @@ def get_current_user() -> dict | None:
         user_id = session.user.id
         email = session.user.email
 
-        # Load profile
+        # ----- Load or create profile -----
         profile_res = (
             supabase.table("profiles")
             .select("global_role, full_name")
             .eq("id", user_id)
-            .single()
             .execute()
         )
-        profile = profile_res.data or {}
-        global_role = profile.get("global_role", "user")
-        full_name = profile.get("full_name") or email
 
-        # Load project memberships
+        if profile_res.data and len(profile_res.data) > 0:
+            profile = profile_res.data[0]
+            global_role = profile.get("global_role", "user")
+            full_name = profile.get("full_name") or email
+        else:
+            # Profile does not exist yet → create it
+            new_profile = {
+                "id": user_id,
+                "email": email,
+                "full_name": email,
+                "global_role": "user",
+            }
+            supabase.table("profiles").insert(new_profile).execute()
+            global_role = "user"
+            full_name = email
+
+        # ----- Load project memberships -----
         members_res = (
             supabase.table("project_members")
             .select("project_id, role")
