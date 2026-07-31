@@ -2,9 +2,10 @@
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 import streamlit as st
-from auth import supabase
+from auth import init_supabase
 import os
 
+supabase = init_supabase()
 
 # =====================================================
 # HELPERS
