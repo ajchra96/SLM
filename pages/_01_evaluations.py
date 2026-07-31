@@ -165,6 +165,7 @@ def show_standards_expanders(standards, user):
                                         file_name = uploaded_file.name
                                     except Exception as e:
                                         st.error(f"Error al subir el archivo: {e}")
+                                        
 
                                 if create_evidence(
                                     component_id=comp["id"],
