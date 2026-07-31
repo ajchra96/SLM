@@ -64,7 +64,7 @@ if st.session_state.selected_project_id is None:
 
     # Sidebar for Project Selector
     with st.sidebar:
-        st.title("Standards Portal")
+        st.title("SLM")
         st.caption(f"{user.get('full_name') or user['email']}")
         st.divider()
 
@@ -178,6 +178,8 @@ with st.sidebar:
         st.warning("🔒 Proyecto cerrado – Solo lectura")
     else:
         st.success("🟢 Proyecto activo")
+
+    st.caption(f"{user.get('full_name') or user['email']}")
 
     st.divider()
 
