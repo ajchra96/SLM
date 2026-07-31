@@ -16,9 +16,6 @@ def show_templates_page(user: dict):
     st.title("📑 Plantillas de Evaluación")
     st.caption("Aquí creas y mantienes las plantillas (evaluaciones, estándares, componentes y documentos extra).")
 
-    if st.button("← Volver a Mis Proyectos"):
-        st.session_state.page = None
-        st.rerun()
 
     st.divider()
 

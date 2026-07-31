@@ -18,10 +18,6 @@ def show_manage_projects(user: dict):
     st.title("🏗️ Gestionar Proyectos")
     st.caption("Solo Super Admin puede crear, cerrar y reabrir proyectos.")
 
-    if st.button("← Volver a Mis Proyectos"):
-        st.session_state.page = None
-        st.rerun()
-
     st.divider()
 
     # -------------------------------------------------

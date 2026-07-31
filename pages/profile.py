@@ -15,12 +15,5 @@ def show_profile_page(user: dict):
 
     st.divider()
 
-    if st.button("← Volver"):
-        st.session_state.page = None
-        st.session_state.selected_project_id = None
-        st.rerun()
-
-    st.divider()
-
     if st.button("🚪 Cerrar sesión", type="primary", use_container_width=True):
         logout()

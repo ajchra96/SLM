@@ -68,20 +68,40 @@ if st.session_state.selected_project_id is None:
         st.caption(f"{user.get('full_name') or user['email']}")
         st.divider()
 
-        st.markdown("**Navegación**")
-        st.markdown("- 🏠 Mis Proyectos")
+        is_home = st.session_state.get("page") is None
+
+        if st.button(
+            "🏠 Mis Proyectos",
+            type="primary" if is_home else "secondary",
+            use_container_width=True,
+        ):
+            st.session_state.page = None
+            st.rerun()
 
         if is_super_admin(user):
-            if st.button("🏗️ Gestionar Proyectos", use_container_width=True):
+            if st.button(
+                "🏗️ Gestionar Proyectos",
+                type="primary" if st.session_state.get("page") == "manage_projects" else "secondary",
+                use_container_width=True,
+            ):
                 st.session_state.page = "manage_projects"
                 st.rerun()
 
-            if st.button("📑 Plantillas de Evaluación", use_container_width=True):
+            if st.button(
+                "📑 Plantillas de Evaluación",
+                type="primary" if st.session_state.get("page") == "templates" else "secondary",
+                use_container_width=True,
+            ):
                 st.session_state.page = "templates"
                 st.rerun()
 
         st.divider()
-        if st.button("👤 Mi perfil", use_container_width=True):
+
+        if st.button(
+            "👤 Mi perfil",
+            type="primary" if st.session_state.get("page") == "profile" else "secondary",
+            use_container_width=True,
+        ):
             st.session_state.page = "profile"
             st.rerun()
 
@@ -161,21 +181,38 @@ with st.sidebar:
 
     st.divider()
 
-    # Project-specific actions (only for project_admin / super_admin)
+    section = st.session_state.get("project_section")
+
+    if st.button(
+        f"📁 {project['name']}",
+        type="primary" if section is None else "secondary",
+        use_container_width=True,
+    ):
+        st.session_state.project_section = None
+        st.rerun()
+
     from permissions import can_edit_structure, can_manage_members
 
     if can_edit_structure(user, project_id, status):
-        if st.button("⚙️ Estructura del proyecto", use_container_width=True):
+        if st.button(
+            "⚙️ Estructura del proyecto",
+            type="primary" if section == "structure" else "secondary",
+            use_container_width=True,
+        ):
             st.session_state.project_section = "structure"
             st.rerun()
 
     if can_manage_members(user, project_id, status):
-        if st.button("👥 Usuarios del proyecto", use_container_width=True):
+        if st.button(
+            "👥 Usuarios del proyecto",
+            type="primary" if section == "members" else "secondary",
+            use_container_width=True,
+        ):
             st.session_state.project_section = "members"
             st.rerun()
 
     st.divider()
-    st.markdown("**General**")
+
     if st.button("🏠 Mis Proyectos", use_container_width=True):
         st.session_state.selected_project_id = None
         st.session_state.project_section = None

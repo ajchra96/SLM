@@ -314,17 +314,6 @@ def show_structure_section(user: dict, project: dict):
     st.title("⚙️ Estructura del proyecto")
     st.caption("Aquí puedes agregar, editar o eliminar estándares y componentes de **este proyecto**.")
 
-    if status == "closed":
-        st.warning("Proyecto cerrado – no se puede modificar la estructura.")
-        if st.button("← Volver al proyecto"):
-            st.session_state.project_section = None
-            st.rerun()
-        return
-
-    if st.button("← Volver al proyecto"):
-        st.session_state.project_section = None
-        st.rerun()
-
     st.divider()
 
     # ----- Add Standard -----
@@ -422,10 +411,6 @@ def show_members_section(user: dict, project: dict):
     status = project.get("status", "active")
 
     st.title("👥 Usuarios del proyecto")
-
-    if st.button("← Volver al proyecto"):
-        st.session_state.project_section = None
-        st.rerun()
 
     st.divider()
 
