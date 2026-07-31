@@ -42,10 +42,11 @@ def get_current_user() -> dict | None:
     Source of truth is ALWAYS st.session_state.
     Never trust the global client's get_session() for identity.
     """
-    # Already have a rich user object for this browser tab
-    if "user" in st.session_state and st.session_state.user:
+    # Safer access – never use dot notation when the key might be missing
+    user = st.session_state.get("user")
+    if user:
         _set_client_session_from_state()
-        return st.session_state.user
+        return user
 
     # No tokens stored for this browser session → not logged in
     if "supabase_session" not in st.session_state:
