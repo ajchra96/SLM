@@ -352,7 +352,7 @@ def get_project_members(project_id: str) -> List[Dict]:
     try:
         res = (
             supabase.table("project_members")
-            .select("*, profiles(email, full_name)")
+            .select("*, profiles!project_members_user_id_fkey(email, full_name)")
             .eq("project_id", project_id)
             .execute()
         )
