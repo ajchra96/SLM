@@ -28,7 +28,8 @@ def get_project_role(user: dict, project_id: str) -> Optional[str]:
 
     # Fallback: ask the database (in case session is stale)
     try:
-        from auth import supabase
+        from auth import supabase, _set_client_session_from_state
+        _set_client_session_from_state()
         res = (
             supabase.table("project_members")
             .select("role")

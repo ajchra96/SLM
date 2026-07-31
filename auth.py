@@ -16,15 +16,25 @@ def init_supabase() -> Client:
 
 
 def _set_client_session_from_state():
-    """Make the global client use the tokens of the CURRENT Streamlit session."""
+    """
+    Make the global client use the tokens of the CURRENT Streamlit session.
+    If this browser tab has no tokens, clear the client so it does not
+    inherit a previous user's session.
+    """
     sess = st.session_state.get("supabase_session")
     if sess and sess.get("access_token") and sess.get("refresh_token"):
         try:
             supabase.auth.set_session(sess["access_token"], sess["refresh_token"])
         except Exception:
-            # Tokens may be expired → clear them
+            # Tokens expired or invalid
             st.session_state.pop("supabase_session", None)
             st.session_state.pop("user", None)
+    else:
+        # Critical: clear any leftover session from another tab/user
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
 
 
 def get_current_user() -> dict | None:
