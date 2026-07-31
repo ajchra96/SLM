@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import streamlit as st
 from auth import supabase
+import os
 
 
 # ====================== STANDARDS ======================
@@ -233,11 +234,14 @@ def create_extra_requirement(
     try:
         file_path = file_name = uploaded_at = None
         if uploaded_file:
+            ext = os.path.splitext(uploaded_file.name)[1].lower() or ".bin"
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name)
-            file_path = f"{user_id}/extra_requirements/{evaluation_id}/{timestamp}_{safe_name}"
+            file_path = f"{user_id}/extra_requirements/{evaluation_id}/{timestamp}{ext}"
+
             supabase.storage.from_("documents").upload(
-                file_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type}
+                file_path,
+                uploaded_file.getvalue(),
+                {"content-type": uploaded_file.type}
             )
             file_name = uploaded_file.name
             uploaded_at = datetime.now().isoformat()
@@ -273,24 +277,33 @@ def upload_file_to_extra_requirement(
 ) -> bool:
     try:
         # Delete old file if exists
-        current = supabase.table("evaluation_extra_requirements").select("file_path").eq("id", requirement_id).single().execute()
+        current = (
+            supabase.table("evaluation_extra_requirements")
+            .select("file_path")
+            .eq("id", requirement_id)
+            .single()
+            .execute()
+        )
         if current.data and current.data.get("file_path"):
             try:
                 supabase.storage.from_("documents").remove([current.data["file_path"]])
-            except:
+            except Exception:
                 pass
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_name = "".join(c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name)
-        file_path = f"{user_id}/extra_requirements/{requirement_id}/{timestamp}_{safe_name}"
+        # New clean name: just the key + original extension
+        import os
+        ext = os.path.splitext(uploaded_file.name)[1].lower() or ".bin"
+        file_path = f"{user_id}/extra_requirements/{requirement_id}/{requirement_id}{ext}"
 
         supabase.storage.from_("documents").upload(
-            file_path, uploaded_file.getvalue(), {"content-type": uploaded_file.type}
+            file_path,
+            uploaded_file.getvalue(),
+            {"content-type": uploaded_file.type}
         )
 
         supabase.table("evaluation_extra_requirements").update({
             "file_path": file_path,
-            "file_name": uploaded_file.name,
+            "file_name": uploaded_file.name,          # keep original name for the UI
             "uploaded_at": datetime.now().isoformat(),
             "uploaded_by_email": user_email
         }).eq("id", requirement_id).execute()
