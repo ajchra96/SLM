@@ -154,11 +154,9 @@ def show_standards_expanders(standards, user):
                                 file_name = None
                                 if uploaded_file:
                                     try:
-                                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                        safe_name = "".join(
-                                            c if c.isalnum() or c in " -_." else "_" for c in uploaded_file.name
-                                        )
-                                        file_path = f"{user['id']}/evidence/{comp['id']}/{timestamp}_{safe_name}"
+                                        import os
+                                        ext = os.path.splitext(uploaded_file.name)[1].lower() or ".bin"
+                                        file_path = f"{user['id']}/evidence/{comp['id']}/{comp['id']}{ext}"
                                         supabase.storage.from_("documents").upload(
                                             file_path,
                                             uploaded_file.getvalue(),
