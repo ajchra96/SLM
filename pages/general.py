@@ -18,7 +18,7 @@ from db import (
     get_template_extra_requirements,
     create_template_extra_requirement,
 )
-
+from auth import logout
 from permissions import is_super_admin
 
 # TODO: Gestionar Proyecto
@@ -277,3 +277,20 @@ def show_templates_page(user: dict):
                     st.rerun()
             else:
                 st.error("El nombre es obligatorio")
+
+# TODO: Profile 
+
+def show_profile_page(user: dict):
+    st.title("👤 Mi Perfil")
+
+    st.markdown(f"""
+    **Nombre:** {user.get('full_name') or '—'}  
+    **Email:** `{user['email']}`  
+    **Rol global:** `{user.get('global_role', 'user')}`  
+    **User ID:** `{user['id']}`
+    """)
+
+    st.divider()
+
+    if st.button("🚪 Cerrar sesión", type="primary", use_container_width=True):
+        logout()
