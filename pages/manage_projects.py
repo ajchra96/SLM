@@ -75,7 +75,7 @@ def show_manage_projects(user: dict):
 
     for project in projects:
         with st.container(border=True):
-            col1, col2, col3 = st.columns([8, 2])
+            col1, col2 = st.columns([8, 2])
 
             status = project.get("status", "active")
             eval_info = project.get("evaluations") or {}
@@ -93,7 +93,7 @@ def show_manage_projects(user: dict):
                     st.success("🟢 Activo")
                 else:
                     st.warning("🔒 Cerrado")
-                    
+
                 #Cerrar / Abrir
                 if status == "active":
                     if st.button("Cerrar proyecto", key=f"close_{project['id']}", width = 'stretch'):
