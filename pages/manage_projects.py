@@ -21,8 +21,9 @@ def show_manage_projects(user: dict):
     st.divider()
 
     # -------------------------------------------------
-    # Create new project (with snapshot)
+    # TODO: Create new project (with snapshot)
     # -------------------------------------------------
+
     st.subheader("➕ Crear nuevo proyecto")
 
     evaluations = get_evaluations()
@@ -61,8 +62,9 @@ def show_manage_projects(user: dict):
     st.divider()
 
     # -------------------------------------------------
-    # List all projects + close/reopen
+    # TODO: List all projects + close/reopen
     # -------------------------------------------------
+
     st.subheader("Proyectos existentes")
 
     projects = get_projects_for_user(user["id"], is_super_admin=True)
@@ -73,37 +75,38 @@ def show_manage_projects(user: dict):
 
     for project in projects:
         with st.container(border=True):
-            col1, col2, col3 = st.columns([5, 2, 3])
+            col1, col2, col3 = st.columns([2, 6, 2])
 
             status = project.get("status", "active")
             eval_info = project.get("evaluations") or {}
             eval_name = eval_info.get("name", "")
 
             with col1:
-                st.markdown(f"### {project['name']}")
-                st.caption(f"Plantilla: {eval_name}")
-                if project.get("description"):
-                    st.caption(project["description"])
-
-            with col2:
                 if status == "active":
                     st.success("🟢 Activo")
                 else:
                     st.warning("🔒 Cerrado")
 
+            with col2:
+                st.markdown(f"### {project['name']}")
+                st.caption(f"Plantilla: {eval_name}")
+                if project.get("description"):
+                    st.caption(project["description"])
+
             with col3:
                 if status == "active":
-                    if st.button("Cerrar proyecto", key=f"close_{project['id']}"):
+                    if st.button("Cerrar proyecto", key=f"close_{project['id']}", width = 'stretch'):
                         if close_project(project["id"], user["id"]):
                             st.success("Proyecto cerrado")
                             st.rerun()
                 else:
-                    if st.button("Reabrir proyecto", key=f"reopen_{project['id']}"):
+                    if st.button("Reabrir proyecto", key=f"reopen_{project['id']}", width = 'stretch'):
                         if reopen_project(project["id"]):
                             st.success("Proyecto reabierto")
                             st.rerun()
 
             # Quick view of members
+            
             with st.expander("Ver miembros"):
                 members = get_project_members(project["id"])
                 if members:
