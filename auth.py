@@ -116,6 +116,7 @@ def get_current_user() -> dict | None:
         st.session_state.pop("user", None)
         return None
 
+# TODO: LOGIN / SIGNUP
 
 def login(email: str, password: str) -> bool:
     try:
@@ -135,7 +136,6 @@ def login(email: str, password: str) -> bool:
         st.error(f"Login failed: {str(e)}")
         return False
 
-
 def signup(email: str, password: str) -> bool:
     try:
         res = supabase.auth.sign_up({"email": email, "password": password})
@@ -146,7 +146,6 @@ def signup(email: str, password: str) -> bool:
     except Exception as e:
         st.error(f"Signup failed: {str(e)}")
         return False
-
 
 def logout():
     try:

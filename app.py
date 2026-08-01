@@ -4,8 +4,12 @@ from auth import init_supabase, get_current_user, login, signup, logout
 from permissions import is_super_admin, can_manage_templates, can_create_project
 from db import get_projects_for_user, get_project
 
+from pages.manage_projects import show_manage_projects
+from pages.templates import show_templates_page
+from pages.profile import show_profile_page
+
 st.set_page_config(
-    page_title="Standards Portal",
+    page_title="SLM",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -22,19 +26,20 @@ init_supabase()
 # -------------------------------------------------
 # Session defaults
 # -------------------------------------------------
+
 if "user" not in st.session_state:
     st.session_state.user = None
 if "selected_project_id" not in st.session_state:
     st.session_state.selected_project_id = None
 
+# -------------------------------------------------
+# TODO: LOGIN / SIGNUP
+# -------------------------------------------------
 
-# -------------------------------------------------
-# LOGIN / SIGNUP
-# -------------------------------------------------
 user = get_current_user()
 
 if user is None:
-    st.title("🔐 Login to Standards Portal")
+    st.title("🔐 Portal de Evaluaciones SLM")
 
     tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
 
@@ -54,15 +59,15 @@ if user is None:
 
     st.stop()
 
-
 # -------------------------------------------------
-# USER IS LOGGED IN
+# TODO: USER IS LOGGED IN
 # -------------------------------------------------
 
 # ========== PROJECT SELECTOR (Home) ==========
 if st.session_state.selected_project_id is None:
 
-    # Sidebar for Project Selector
+    # TODO: Sidebar Main
+
     with st.sidebar:
         st.title("SLM")
         st.caption(f"{user.get('full_name') or user['email']}")
@@ -112,21 +117,19 @@ if st.session_state.selected_project_id is None:
     current_page = st.session_state.get("page")
 
     if current_page == "manage_projects" and is_super_admin(user):
-        from pages.manage_projects import show_manage_projects
         show_manage_projects(user)
         st.stop()
 
     if current_page == "templates" and is_super_admin(user):
-        from pages.templates import show_templates_page
         show_templates_page(user)
         st.stop()
 
     if current_page == "profile":
-        from pages.profile import show_profile_page
         show_profile_page(user)
         st.stop()
 
-    # ----- Default: Project list -----
+    # TODO: Mis Proyectos
+
     st.title("🏠 Mis Proyectos")
     st.caption("Selecciona un proyecto para continuar")
 
@@ -147,8 +150,8 @@ if st.session_state.selected_project_id is None:
                     eval_name = eval_info.get("name", "")
                     icon = eval_info.get("icon") or "📁"
 
-                    st.markdown(f"### {icon} {project['name']}")
-                    st.caption(f"{eval_name}")
+                    st.markdown(f"{eval_name}")
+                    st.caption(f"### {icon} {project['name']} - {status_icon} **{status_label}**")
                     st.markdown(f"{status_icon} **{status_label}**")
 
                     if st.button("Abrir →", key=f"open_{project['id']}", use_container_width=True):
