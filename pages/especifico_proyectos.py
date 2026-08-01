@@ -1,4 +1,5 @@
-# pages/project_workspace.py
+# pages/especifico_proyectos.py
+
 import streamlit as st
 from datetime import datetime, timedelta
 from auth import supabase, _set_client_session_from_state

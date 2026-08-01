@@ -1,11 +1,12 @@
 # app.py
+
 import streamlit as st
 from auth import init_supabase, get_current_user, login, signup, logout
 from permissions import is_super_admin, can_manage_templates, can_create_project
 from db import get_projects_for_user, get_project
 
 from pages.general import show_manage_projects, show_templates_page, show_profile_page
-from pages.project_workspace import show_structure_section, show_members_section, show_project_workspace
+from pages.especifico_proyectos import show_structure_section, show_members_section, show_project_workspace
 
 st.set_page_config(
     page_title="SLM",
