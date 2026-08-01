@@ -75,25 +75,26 @@ def show_manage_projects(user: dict):
 
     for project in projects:
         with st.container(border=True):
-            col1, col2, col3 = st.columns([2, 6, 2])
+            col1, col2, col3 = st.columns([8, 2])
 
             status = project.get("status", "active")
             eval_info = project.get("evaluations") or {}
             eval_name = eval_info.get("name", "")
 
             with col1:
-                if status == "active":
-                    st.success("🟢 Activo")
-                else:
-                    st.warning("🔒 Cerrado")
-
-            with col2:
                 st.markdown(f"### {project['name']}")
                 st.caption(f"Plantilla: {eval_name}")
                 if project.get("description"):
                     st.caption(project["description"])
 
-            with col3:
+            with col2:
+                #Estado
+                if status == "active":
+                    st.success("🟢 Activo")
+                else:
+                    st.warning("🔒 Cerrado")
+                    
+                #Cerrar / Abrir
                 if status == "active":
                     if st.button("Cerrar proyecto", key=f"close_{project['id']}", width = 'stretch'):
                         if close_project(project["id"], user["id"]):
@@ -106,7 +107,7 @@ def show_manage_projects(user: dict):
                             st.rerun()
 
             # Quick view of members
-            
+
             with st.expander("Ver miembros"):
                 members = get_project_members(project["id"])
                 if members:
