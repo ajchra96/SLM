@@ -421,8 +421,7 @@ def show_members_section(user: dict, project: dict):
             profile = m.get("profiles") or {}
             col1, col2, col3 = st.columns([4, 3, 2])
             with col1:
-                st.markdown(f"**{profile.get('full_name') or profile.get('email')}**")
-                st.caption(profile.get("email"))
+                st.markdown(f"**{profile.get('email')}**")
             with col2:
                 st.markdown(f"Rol: `{m.get('role')}`")
             with col3:
