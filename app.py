@@ -4,9 +4,9 @@ from auth import init_supabase, get_current_user, login, signup, logout
 from permissions import is_super_admin, can_manage_templates, can_create_project
 from db import get_projects_for_user, get_project
 
-from pages.manage_projects import show_manage_projects
-from pages.templates import show_templates_page
+from pages.general import (show_manage_projects, show_templates_page)
 from pages.profile import show_profile_page
+from pages.project_workspace import (show_structure_section, show_members_section, show_project_workspace)
 
 st.set_page_config(
     page_title="SLM",
@@ -235,12 +235,9 @@ with st.sidebar:
 section = st.session_state.get("project_section")
 
 if section == "structure":
-    from pages.project_workspace import show_structure_section
     show_structure_section(user, project)
 elif section == "members":
-    from pages.project_workspace import show_members_section
     show_members_section(user, project)
 else:
     # Default workspace with tabs
-    from pages.project_workspace import show_project_workspace
     show_project_workspace(user, project)
