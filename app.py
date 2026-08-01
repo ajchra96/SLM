@@ -150,9 +150,8 @@ if st.session_state.selected_project_id is None:
                     eval_name = eval_info.get("name", "")
                     icon = eval_info.get("icon") or "📁"
 
-                    st.markdown(f"{eval_name}")
-                    st.caption(f"### {icon} {project['name']} - {status_icon} **{status_label}**")
-                    st.markdown(f"{status_icon} **{status_label}**")
+                    st.markdown(f"### {eval_name}")
+                    st.caption(f" {status_icon} {project['name']}")
 
                     if st.button("Abrir →", key=f"open_{project['id']}", use_container_width=True):
                         st.session_state.selected_project_id = project["id"]
